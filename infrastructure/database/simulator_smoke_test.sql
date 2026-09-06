@@ -11,10 +11,12 @@ recent_events AS (
       AND source_system = 'SIMULATOR'
 ),
 active_sim_heat AS (
-    SELECT COUNT(*) AS heat_count
-    FROM heats
-    WHERE status IN ('EAF', 'LF', 'CASTING')
-      AND attributes @> '{"simulator": true}'::jsonb
+    SELECT COUNT(DISTINCT h.id) AS heat_count
+    FROM heats h
+    JOIN process_samples ps ON ps.heat_id = h.id
+    WHERE h.status IN ('EAF', 'LF', 'CASTING')
+      AND ps.ts >= now() - interval '30 seconds'
+      AND ps.attributes @> '{"simulator": true}'::jsonb
 )
 SELECT
     'level1-simulator-smoke-test' AS test_name,

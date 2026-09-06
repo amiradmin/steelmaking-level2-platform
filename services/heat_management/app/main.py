@@ -50,7 +50,7 @@ ALLOWED_TRANSITIONS: dict[str, set[str]] = {
 
 app = FastAPI(
     title="Steelmaking Level 2 - Heat Management",
-    version="0.2.0",
+    version="0.2.1",
     description=(
         "Level 2 heat tracking, lifecycle and material-consumption API for EAF/LF/CCM. "
         "This service manages production state and history; it does not directly control Level 1 actuators."
@@ -114,7 +114,10 @@ def require_status(value: str) -> str:
 
 
 def fetch_heat(conn: Connection, heat_no: str, *, for_update: bool = False) -> dict[str, Any]:
-    locking = " FOR UPDATE" if for_update else ""
+    # Lock only the heat row. The query LEFT JOINs steel_grades, so a bare
+    # FOR UPDATE can fail in PostgreSQL because it also attempts to lock the
+    # nullable side of the outer join.
+    locking = " FOR UPDATE OF h" if for_update else ""
     row = conn.execute(
         f"""
         SELECT

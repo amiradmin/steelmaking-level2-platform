@@ -37,6 +37,34 @@ services:
     networks:
       - level2-net
 
+  heat-management:
+    build:
+      context: ./services/heat_management
+    container_name: steelmaking-level2-heat-management
+    restart: unless-stopped
+    depends_on:
+      historian-db:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      DB_HOST: historian-db
+      DB_PORT: 5432
+    ports:
+      - "${HEAT_MANAGEMENT_PORT:-8000}:8000"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+    networks:
+      - level2-net
+
 volumes:
   historian_data:
 

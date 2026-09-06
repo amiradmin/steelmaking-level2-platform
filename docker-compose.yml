@@ -3,10 +3,8 @@ services:
     image: timescale/timescaledb:latest-pg16
     container_name: steelmaking-level2-historian
     restart: unless-stopped
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB:-steelmaking_level2}
-      POSTGRES_USER: ${POSTGRES_USER:-level2}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-level2_dev_password}
+    env_file:
+      - .env
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
@@ -15,11 +13,27 @@ services:
     healthcheck:
       test:
         - CMD-SHELL
-        - pg_isready -U ${POSTGRES_USER:-level2} -d ${POSTGRES_DB:-steelmaking_level2}
+        - pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}
       interval: 5s
       timeout: 5s
       retries: 10
       start_period: 10s
+    networks:
+      - level2-net
+
+  level1-simulator:
+    build:
+      context: ./services/level1_simulator
+    container_name: steelmaking-level2-simulator
+    restart: unless-stopped
+    depends_on:
+      historian-db:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      DB_HOST: historian-db
+      DB_PORT: 5432
     networks:
       - level2-net
 

@@ -1,0 +1,31 @@
+services:
+  historian-db:
+    image: timescale/timescaledb:latest-pg16
+    container_name: steelmaking-level2-historian
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-steelmaking_level2}
+      POSTGRES_USER: ${POSTGRES_USER:-level2}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-level2_dev_password}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - historian_data:/var/lib/postgresql/data
+      - ./infrastructure/database/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U ${POSTGRES_USER:-level2} -d ${POSTGRES_DB:-steelmaking_level2}
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks:
+      - level2-net
+
+volumes:
+  historian_data:
+
+networks:
+  level2-net:
+    name: steelmaking-level2-net

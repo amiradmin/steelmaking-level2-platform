@@ -50,9 +50,9 @@ ALLOWED_TRANSITIONS: dict[str, set[str]] = {
 
 app = FastAPI(
     title="Steelmaking Level 2 - Heat Management",
-    version="0.1.0",
+    version="0.2.0",
     description=(
-        "Level 2 heat tracking and lifecycle API for EAF/LF/CCM. "
+        "Level 2 heat tracking, lifecycle and material-consumption API for EAF/LF/CCM. "
         "This service manages production state and history; it does not directly control Level 1 actuators."
     ),
 )
@@ -72,6 +72,19 @@ class TransitionRequest(BaseModel):
     target_status: str = Field(min_length=1, max_length=32)
     reason: str | None = Field(default=None, max_length=512)
     actor: str = Field(default="operator", min_length=1, max_length=128)
+
+
+class MaterialAddition(BaseModel):
+    material_code: str = Field(min_length=1, max_length=128)
+    material_name: str | None = Field(default=None, max_length=255)
+    quantity: float = Field(gt=0)
+    unit: str = Field(min_length=1, max_length=32)
+    equipment_code: str | None = Field(default=None, max_length=128)
+    source_system: str = Field(default="LEVEL2_MATERIAL_TRACKING", min_length=1, max_length=64)
+    batch_no: str | None = Field(default=None, max_length=128)
+    addition_time: datetime | None = None
+    actor: str = Field(default="operator", min_length=1, max_length=128)
+    attributes: dict[str, Any] = Field(default_factory=dict)
 
 
 @contextmanager
@@ -418,3 +431,195 @@ def transition_heat(heat_no: str, payload: TransitionRequest) -> dict[str, Any]:
             )
 
         return fetch_heat(conn, heat_no)
+
+
+@app.post("/heats/{heat_no}/materials", status_code=status.HTTP_201_CREATED)
+def add_material(heat_no: str, payload: MaterialAddition) -> dict[str, Any]:
+    addition_time = payload.addition_time or datetime.now(timezone.utc)
+    material_code = payload.material_code.strip().upper()
+    unit = payload.unit.strip()
+
+    with db_connection() as conn:
+        with conn.transaction():
+            heat = fetch_heat(conn, heat_no, for_update=True)
+            equipment_id = None
+            equipment_code = None
+            if payload.equipment_code:
+                equipment = conn.execute(
+                    "SELECT id, code FROM equipment WHERE code = %s AND is_active = TRUE",
+                    (payload.equipment_code,),
+                ).fetchone()
+                if not equipment:
+                    raise HTTPException(
+                        status_code=422,
+                        detail=f"Equipment {payload.equipment_code} not found or inactive",
+                    )
+                equipment_id = equipment["id"]
+                equipment_code = equipment["code"]
+
+            attributes = {
+                **payload.attributes,
+                "actor": payload.actor,
+                "recorded_by": "heat-management-api",
+            }
+            row = conn.execute(
+                """
+                INSERT INTO material_consumptions (
+                    heat_id,
+                    equipment_id,
+                    material_code,
+                    material_name,
+                    quantity,
+                    unit,
+                    addition_time,
+                    source_system,
+                    batch_no,
+                    attributes
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                RETURNING
+                    id,
+                    material_code,
+                    material_name,
+                    quantity::double precision AS quantity,
+                    unit,
+                    addition_time,
+                    source_system,
+                    batch_no,
+                    attributes,
+                    created_at
+                """,
+                (
+                    heat["id"],
+                    equipment_id,
+                    material_code,
+                    payload.material_name,
+                    payload.quantity,
+                    unit,
+                    addition_time,
+                    payload.source_system,
+                    payload.batch_no,
+                    Jsonb(attributes),
+                ),
+            ).fetchone()
+
+            conn.execute(
+                """
+                INSERT INTO heat_events (
+                    event_type,
+                    source_system,
+                    source_event_id,
+                    area,
+                    equipment_id,
+                    heat_id,
+                    severity,
+                    occurred_at,
+                    payload
+                )
+                VALUES (
+                    'MATERIAL_ADDED',
+                    'LEVEL2_MATERIAL_TRACKING',
+                    %s,
+                    %s,
+                    %s,
+                    %s,
+                    'INFO',
+                    %s,
+                    %s
+                )
+                """,
+                (
+                    f"MT-{heat_no}-{material_code}-{datetime.now(timezone.utc).timestamp()}",
+                    heat["status"],
+                    equipment_id,
+                    heat["id"],
+                    addition_time,
+                    Jsonb(
+                        {
+                            "material_code": material_code,
+                            "material_name": payload.material_name,
+                            "quantity": payload.quantity,
+                            "unit": unit,
+                            "batch_no": payload.batch_no,
+                            "equipment_code": equipment_code,
+                            "actor": payload.actor,
+                        }
+                    ),
+                ),
+            )
+
+    return {"heat_no": heat_no, "equipment_code": equipment_code, **row}
+
+
+@app.get("/heats/{heat_no}/materials")
+def list_materials(
+    heat_no: str,
+    material_code: str | None = Query(default=None),
+    limit: int = Query(default=200, ge=1, le=2000),
+) -> dict[str, Any]:
+    with db_connection() as conn:
+        heat = fetch_heat(conn, heat_no)
+        params: list[Any] = [heat["id"]]
+        where_material = ""
+        if material_code:
+            where_material = "AND mc.material_code = %s"
+            params.append(material_code.strip().upper())
+        params.append(limit)
+
+        rows = conn.execute(
+            f"""
+            SELECT
+                mc.id,
+                mc.material_code,
+                mc.material_name,
+                mc.quantity::double precision AS quantity,
+                mc.unit,
+                mc.addition_time,
+                mc.source_system,
+                mc.batch_no,
+                e.code AS equipment_code,
+                mc.attributes,
+                mc.created_at
+            FROM material_consumptions mc
+            LEFT JOIN equipment e ON e.id = mc.equipment_id
+            WHERE mc.heat_id = %s
+            {where_material}
+            ORDER BY mc.addition_time DESC
+            LIMIT %s
+            """,
+            params,
+        ).fetchall()
+    return {"heat_no": heat_no, "status": heat["status"], "items": rows}
+
+
+@app.get("/heats/{heat_no}/material-summary")
+def material_summary(heat_no: str) -> dict[str, Any]:
+    with db_connection() as conn:
+        heat = fetch_heat(conn, heat_no)
+        rows = conn.execute(
+            """
+            SELECT
+                material_code,
+                COALESCE(MAX(material_name), material_code) AS material_name,
+                unit,
+                SUM(quantity)::double precision AS total_quantity,
+                COUNT(*) AS additions,
+                MIN(addition_time) AS first_addition,
+                MAX(addition_time) AS last_addition
+            FROM material_consumptions
+            WHERE heat_id = %s
+            GROUP BY material_code, unit
+            ORDER BY material_code, unit
+            """,
+            (heat["id"],),
+        ).fetchall()
+        total_additions = conn.execute(
+            "SELECT COUNT(*) AS count FROM material_consumptions WHERE heat_id = %s",
+            (heat["id"],),
+        ).fetchone()["count"]
+    return {
+        "heat_no": heat_no,
+        "status": heat["status"],
+        "total_additions": total_additions,
+        "materials": rows,
+    }

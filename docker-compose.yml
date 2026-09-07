@@ -78,6 +78,9 @@ services:
     environment:
       DB_HOST: historian-db
       DB_PORT: 5432
+      DJANGO_BOOTSTRAP_USERNAME: ${DJANGO_BOOTSTRAP_USERNAME:-OP-4109}
+      DJANGO_BOOTSTRAP_PASSWORD: ${DJANGO_BOOTSTRAP_PASSWORD:-Level2Demo-1405}
+      DJANGO_BOOTSTRAP_DISPLAY_NAME: ${DJANGO_BOOTSTRAP_DISPLAY_NAME:-اپراتور شیفت}
     ports:
       - "${LEVEL2_API_PORT:-8080}:8080"
     healthcheck:

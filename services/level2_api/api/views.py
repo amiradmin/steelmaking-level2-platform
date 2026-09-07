@@ -5,7 +5,9 @@ from typing import Any
 from django.db import DatabaseError
 from django.utils.dateparse import parse_datetime
 from rest_framework.decorators import api_view
+from rest_framework.decorators import permission_classes
 from rest_framework.exceptions import NotFound, ValidationError
+from rest_framework.permissions import AllowAny
 from rest_framework.request import Request
 from rest_framework.response import Response
 
@@ -55,6 +57,7 @@ def _heat_or_404(heat_no: str) -> dict[str, Any]:
 
 
 @api_view(["GET"])
+@permission_classes([AllowAny])
 def health(request: Request) -> Response:
     del request
     try:
@@ -76,6 +79,19 @@ def health(request: Request) -> Response:
             "service": "level2-api",
             "framework": "django-rest-framework",
             "api_version": "v1",
+        }
+    )
+
+
+@api_view(["GET"])
+def current_user(request: Request) -> Response:
+    user = request.user
+    display_name = user.get_full_name().strip() or user.get_username()
+    return Response(
+        {
+            "username": user.get_username(),
+            "display_name": display_name,
+            "is_staff": user.is_staff,
         }
     )
 

@@ -29,6 +29,16 @@ The container applies Django migrations before Gunicorn starts. Existing steelma
 
 ## Endpoints
 
+All `/api/v1` operational endpoints require `Authorization: Bearer <access-token>`.
+The health endpoint remains public for container orchestration.
+
+### Authentication
+
+- `POST /api/v1/auth/token` — obtain access and refresh tokens
+- `POST /api/v1/auth/token/refresh` — renew an expired access token
+- `POST /api/v1/auth/token/verify` — verify a token
+- `GET /api/v1/auth/me` — return the authenticated operator
+
 ### Metadata
 
 - `GET /api/v1/meta`
@@ -83,9 +93,16 @@ DJANGO_SECRET_KEY=change-me-in-production
 DJANGO_DEBUG=0
 DJANGO_ALLOWED_HOSTS=*
 DB_CONN_MAX_AGE=60
+JWT_ACCESS_MINUTES=15
+JWT_REFRESH_HOURS=12
+DJANGO_BOOTSTRAP_USERNAME=OP-4109
+DJANGO_BOOTSTRAP_PASSWORD=Level2Demo-1405
+DJANGO_BOOTSTRAP_DISPLAY_NAME=اپراتور شیفت
 ```
 
-Production deployments must replace the development secret and restrict allowed hosts and CORS origins.
+The container creates the bootstrap operator only when it does not already exist; it never resets an
+existing password during restart. Production deployments must replace the development credentials and
+secret, and restrict allowed hosts and CORS origins.
 
 ## Acceptance criteria
 
@@ -93,13 +110,15 @@ The work package is accepted locally when:
 
 1. `steelmaking-level2-api` starts with Django/DRF and becomes healthy.
 2. `/health` reports database connectivity and `api_version=v1`.
-3. `/api/v1/meta` reports `framework=django-rest-framework`.
-4. Existing EAF/LF/CCM equipment and steel-grade queries remain readable.
-5. An active simulated Heat can be retrieved.
-6. Heat overview includes live process values and events.
-7. Event, alarm and historian queries retain the previous API behavior.
-8. Swagger/OpenAPI are available.
-9. The existing smoke test passes unchanged.
+3. Valid operator credentials return an access/refresh JWT pair.
+4. Anonymous operational API requests return `401`, while authenticated requests succeed.
+5. `/api/v1/meta` reports `framework=django-rest-framework`.
+6. Existing EAF/LF/CCM equipment and steel-grade queries remain readable.
+7. An active simulated Heat can be retrieved.
+8. Heat overview includes live process values and events.
+9. Event, alarm and historian queries retain the previous API behavior.
+10. Swagger/OpenAPI are available.
+11. The JWT-aware smoke test passes.
 
 Automated local verification:
 
@@ -119,8 +138,8 @@ Result: PASS
 ## Next Django work packages
 
 - Define Django models for master data and transactional Level 2 entities.
-- Add users, plant roles and permissions.
+- Add plant-specific roles and object-level permissions.
 - Configure Django Admin for equipment, grades and configuration data.
-- Add JWT/SSO authentication for operator/dashboard clients.
+- Add SSO as an optional enterprise identity provider alongside JWT.
 - Move orchestration workflows that belong to the main platform into Django services.
 - Keep real-time ingestion, simulation and focused calculation microservices in FastAPI.

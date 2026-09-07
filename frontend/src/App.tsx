@@ -1,4 +1,5 @@
-import { FormEvent, ReactNode, useEffect, useMemo, useState } from 'react'
+import { FormEvent, ReactNode, useCallback, useEffect, useMemo, useState } from 'react'
+import { AuthenticationExpiredError, OperatorProfile, authorizedFetch, clearTokens, loadTokens, login } from './auth'
 
 type Theme = 'dark' | 'light'
 type View = 'login' | 'dashboard'
@@ -117,20 +118,29 @@ function Brand({ compact = false }: { compact?: boolean }) {
   )
 }
 
-function LoginPage({ theme, onThemeChange, onLogin }: { theme: Theme; onThemeChange: () => void; onLogin: () => void }) {
+function LoginPage({ theme, onThemeChange, onLogin }: { theme: Theme; onThemeChange: () => void; onLogin: (username: string, password: string, remember: boolean) => Promise<void> }) {
   const [employeeId, setEmployeeId] = useState('OP-4109')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [formError, setFormError] = useState('')
+  const [remember, setRemember] = useState(true)
+  const [submitting, setSubmitting] = useState(false)
 
-  function submit(event: FormEvent<HTMLFormElement>) {
+  async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!employeeId.trim() || !password.trim()) {
       setFormError('کد کاربری و رمز عبور را وارد کنید.')
       return
     }
     setFormError('')
-    onLogin()
+    setSubmitting(true)
+    try {
+      await onLogin(employeeId.trim(), password, remember)
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : 'ورود به سامانه انجام نشد.')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -183,9 +193,9 @@ function LoginPage({ theme, onThemeChange, onLogin }: { theme: Theme; onThemeCha
             <div className="label-row"><label className="form-label" htmlFor="password">رمز عبور امنیتی</label><button type="button" className="text-button">بازیابی گذرواژه</button></div>
             <div className="input-with-icon"><Icon name="settings" /><input id="password" type={showPassword ? 'text' : 'password'} value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" placeholder="رمز عبور" /><button type="button" className="show-password" onClick={() => setShowPassword((value) => !value)}>{showPassword ? 'پنهان' : 'نمایش'}</button></div>
 
-            <label className="remember-row"><input type="checkbox" defaultChecked /><span>به‌خاطرسپاری این ایستگاه کاری</span><small>TLS 1.3 / L2 ENCRYPT</small></label>
+            <label className="remember-row"><input type="checkbox" checked={remember} onChange={(event) => setRemember(event.target.checked)} /><span>به‌خاطرسپاری این ایستگاه کاری</span><small>TLS 1.3 / JWT</small></label>
             {formError && <p className="form-error" role="alert">{formError}</p>}
-            <button className="login-button" type="submit"><Icon name="logout" /> ورود به کنسول عملیات</button>
+            <button className="login-button" type="submit" disabled={submitting}><Icon name="logout" /> {submitting ? 'در حال احراز هویت…' : 'ورود به کنسول عملیات'}</button>
           </form>
           <div className="support-row"><span>پشتیبانی فنی شیفت: داخلی ۴۲۱۸</span><span>نسخه ۲.۸.۴</span></div>
         </div>
@@ -220,45 +230,55 @@ function StatusBadge({ status }: { status: string }) {
   return <span className={`status-badge status-${status.toLowerCase()}`}>{labels[status] ?? status}</span>
 }
 
-function Dashboard({ theme, onThemeChange, onLogout }: { theme: Theme; onThemeChange: () => void; onLogout: () => void }) {
+function Dashboard({ theme, onThemeChange, onLogout, initialOperator }: { theme: Theme; onThemeChange: () => void; onLogout: () => void; initialOperator: OperatorProfile | null }) {
   const [heats, setHeats] = useState<Heat[]>([])
   const [overview, setOverview] = useState<HeatOverview | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [operator, setOperator] = useState<OperatorProfile | null>(initialOperator)
 
   useEffect(() => {
     let cancelled = false
     Promise.all([
-      fetch('/api/v1/meta').then((response) => {
+      authorizedFetch('/api/v1/meta').then((response) => {
         if (!response.ok) throw new Error('Metadata API unavailable')
         return response.json() as Promise<ApiMeta>
       }),
-      fetch('/api/v1/heats?limit=12').then((response) => {
+      authorizedFetch('/api/v1/heats?limit=12').then((response) => {
         if (!response.ok) throw new Error('Heat API unavailable')
         return response.json() as Promise<Heat[]>
       }),
+      authorizedFetch('/api/v1/auth/me').then((response) => {
+        if (!response.ok) throw new Error('Operator profile unavailable')
+        return response.json() as Promise<OperatorProfile>
+      }),
     ])
-      .then(([, heatResponse]) => {
+      .then(([, heatResponse, operatorResponse]) => {
         if (cancelled) return
         setHeats(heatResponse)
+        setOperator(operatorResponse)
         const active = heatResponse.find((heat) => !['COMPLETED', 'ABORTED', 'CANCELLED'].includes(heat.status))
         if (active) {
-          fetch(`/api/v1/heats/${encodeURIComponent(active.heat_no)}/overview`)
+          authorizedFetch(`/api/v1/heats/${encodeURIComponent(active.heat_no)}/overview`)
             .then((response) => response.ok ? response.json() : null)
             .then((value: HeatOverview | null) => { if (!cancelled) setOverview(value) })
             .catch(() => undefined)
         }
       })
-      .catch(() => {
+      .catch((requestError: unknown) => {
         if (!cancelled) {
+          if (requestError instanceof AuthenticationExpiredError) {
+            onLogout()
+            return
+          }
           setError('ارتباط با API برقرار نیست؛ داده‌های نمایشی آخرین همگام‌سازی نمایش داده می‌شود.')
           setHeats(demoHeats)
         }
       })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
-  }, [])
+  }, [onLogout])
 
   const activeHeat = useMemo(() => heats.find((heat) => !['COMPLETED', 'ABORTED', 'CANCELLED'].includes(heat.status)) ?? heats[0], [heats])
   const alarms = overview?.active_alarms ?? []
@@ -288,7 +308,7 @@ function Dashboard({ theme, onThemeChange, onLogout }: { theme: Theme; onThemeCh
             <ThemeToggle theme={theme} onChange={onThemeChange} />
             <button className="icon-button notification-button" type="button" aria-label="هشدارها"><Icon name="bell" /><i>3</i></button>
             <button className="language-button active" type="button">FA</button>
-            <div className="operator"><span><strong>مهندس احمدی</strong><small>سرپرست متالورژی L2</small></span><span className="operator-avatar"><Icon name="user" /></span></div>
+            <div className="operator"><span><strong>{operator?.display_name ?? operator?.username ?? 'اپراتور Level 2'}</strong><small>کاربر احرازشده سامانه</small></span><span className="operator-avatar"><Icon name="user" /></span></div>
           </div>
         </header>
 
@@ -352,7 +372,8 @@ function Dashboard({ theme, onThemeChange, onLogout }: { theme: Theme; onThemeCh
 
 function App() {
   const [theme, setTheme] = useState<Theme>(getInitialTheme)
-  const [view, setView] = useState<View>('login')
+  const [view, setView] = useState<View>(() => loadTokens() ? 'dashboard' : 'login')
+  const [operator, setOperator] = useState<OperatorProfile | null>(null)
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme
@@ -361,9 +382,21 @@ function App() {
 
   const toggleTheme = () => setTheme((value) => value === 'dark' ? 'light' : 'dark')
 
+  async function handleLogin(username: string, password: string, remember: boolean) {
+    const profile = await login(username, password, remember)
+    setOperator(profile)
+    setView('dashboard')
+  }
+
+  const handleLogout = useCallback(() => {
+    clearTokens()
+    setOperator(null)
+    setView('login')
+  }, [])
+
   return view === 'login'
-    ? <LoginPage theme={theme} onThemeChange={toggleTheme} onLogin={() => setView('dashboard')} />
-    : <Dashboard theme={theme} onThemeChange={toggleTheme} onLogout={() => setView('login')} />
+    ? <LoginPage theme={theme} onThemeChange={toggleTheme} onLogin={handleLogin} />
+    : <Dashboard theme={theme} onThemeChange={toggleTheme} onLogout={handleLogout} initialOperator={operator} />
 }
 
 export default App

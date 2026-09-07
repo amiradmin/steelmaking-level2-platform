@@ -25,13 +25,13 @@ Container: `steelmaking-level2-heat-management`
 Default host endpoint:
 
 ```text
-http://localhost:8000
+http://localhost:9000
 ```
 
 Interactive OpenAPI documentation:
 
 ```text
-http://localhost:8000/docs
+http://localhost:9000/docs
 ```
 
 ## API endpoints
@@ -93,7 +93,7 @@ A successful transition creates a `STATUS_CHANGED` event containing:
 ## Create heat example
 
 ```bash
-curl -X POST http://localhost:8000/heats \
+curl -X POST http://localhost:9000/heats \
   -H 'Content-Type: application/json' \
   -d '{
     "heat_no": "L2-DEMO-001",
@@ -107,7 +107,7 @@ curl -X POST http://localhost:8000/heats \
 ## Transition example
 
 ```bash
-curl -X POST http://localhost:8000/heats/L2-DEMO-001/transition \
+curl -X POST http://localhost:9000/heats/L2-DEMO-001/transition \
   -H 'Content-Type: application/json' \
   -d '{
     "target_status": "EAF",

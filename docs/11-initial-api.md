@@ -1,19 +1,31 @@
-# 11 — Initial Level 2 REST API
+# 11 — Level 2 REST API
 
 ## Objective
 
-Provide a stable, versioned REST read API for Level 2 consumers such as the operator dashboard, reporting tools and future Level 3/MES integration adapters.
+Provide a stable, versioned REST API for the Level 2 platform. The `level2-api` service is the main application boundary for operator dashboards, reporting, administration, authentication/authorization and future Level 3/MES integration.
 
-The public API is implemented as a dedicated `level2-api` service. Domain write operations remain in the Heat Management service so process-state mutation is not mixed with historian and reporting reads.
+## Framework split
+
+The platform intentionally uses two Python web stacks for different responsibilities:
+
+- **Django + Django REST Framework** — `level2-api`, the main platform application and public API.
+- **FastAPI** — focused process/domain services such as `heat-management`, simulators and future low-latency calculation/integration services.
+
+This keeps business administration, users, permissions and the main API in Django while retaining FastAPI for small independent services that benefit from a lightweight async-friendly runtime.
 
 ## Service
 
 - Container: `steelmaking-level2-api`
+- Framework: Django + Django REST Framework
+- Production server: Gunicorn
 - Local port: `8080`
 - API prefix: `/api/v1`
+- Django admin: `http://localhost:8080/admin/`
 - Swagger: `http://localhost:8080/docs`
 - OpenAPI JSON: `http://localhost:8080/openapi.json`
 - Health: `GET /health`
+
+The container applies Django migrations before Gunicorn starts. Existing steelmaking tables remain the current plant data model; the first Django migration keeps the existing SQL queries behind a repository layer so the HTTP contract does not change. Domain tables can be moved to Django ORM incrementally in later work packages.
 
 ## Endpoints
 
@@ -21,120 +33,78 @@ The public API is implemented as a dedicated `level2-api` service. Domain write 
 
 - `GET /api/v1/meta`
 
-Returns API version, process flow and supported capabilities.
-
 ### Heats
 
 - `GET /api/v1/heats`
 - `GET /api/v1/heats/{heat_no}`
 - `GET /api/v1/heats/{heat_no}/overview`
 
-The overview endpoint aggregates:
+The overview aggregates Heat master/status, latest process values, material consumption, recent events and active alarms.
 
-- Heat master/status
-- Latest process values
-- Material consumption summary
-- Recent heat events
-- Active alarms
-
-### Equipment master
+### Equipment and steel grades
 
 - `GET /api/v1/equipment`
-- Optional filter: `area=EAF|LF|CCM`
-
-### Steel-grade master
-
 - `GET /api/v1/steel-grades`
 
-### Events
+### Events and alarms
 
 - `GET /api/v1/events`
-
-Filters:
-
-- `heat_no`
-- `event_type`
-- `source_system`
-- `limit`
-
-### Alarms
-
 - `GET /api/v1/alarms`
 
-Filters:
-
-- `state`
-- `severity`
-- `heat_no`
-- `limit`
-
-### Historian latest values
+### Historian
 
 - `GET /api/v1/historian/latest`
-
-Filters:
-
-- `area`
-- `equipment_code`
-- `quality`
-
-### Historian tag samples
-
 - `GET /api/v1/historian/tags/{tag_name}/samples`
-
-Filters:
-
-- `start`
-- `end`
-- `heat_no`
-- `limit`
 
 ## Architecture boundary
 
 ```text
-Dashboard / Reports / Future L3 Adapter
-                 │
-                 ▼
-          Public Level2 API :8080
-                 │
-        ┌────────┴────────┐
-        ▼                 ▼
- Historian/Read DB   Domain services
- PostgreSQL/         Heat Management
- TimescaleDB         :8000
+Operator UI / Reports / Admin / Future Level 3
+                     │
+                     ▼
+        Django + DRF level2-api :8080
+                     │
+          ┌──────────┴──────────┐
+          ▼                     ▼
+ PostgreSQL / TimescaleDB   FastAPI services
+ plant/read model           heat-management
+                            future calculators
+                            integration adapters
 ```
 
-The v0.1 public API is intentionally read-oriented. Mutation of production state remains behind domain-specific services. This reduces accidental coupling between dashboard/reporting clients and process-state changes.
+The public URL contract remains `/api/v1/...` during the FastAPI-to-Django migration so dashboards and smoke tests do not require changes.
 
-## CORS
-
-Local CORS origins are configured by:
+## Environment
 
 ```text
+LEVEL2_API_PORT=8080
 API_CORS_ORIGINS=*
+DJANGO_SECRET_KEY=change-me-in-production
+DJANGO_DEBUG=0
+DJANGO_ALLOWED_HOSTS=*
+DB_CONN_MAX_AGE=60
 ```
 
-For production, this must be restricted to approved dashboard/application origins.
+Production deployments must replace the development secret and restrict allowed hosts and CORS origins.
 
 ## Acceptance criteria
 
 The work package is accepted locally when:
 
-1. `steelmaking-level2-api` is healthy.
-2. `/health` reports database connectivity.
-3. `/api/v1/meta` reports API version `v1`.
-4. EAF/LF/CCM equipment master is readable.
-5. Steel-grade master is readable.
-6. An active simulated Heat can be retrieved.
-7. Heat overview includes live process values and events.
-8. Event query returns Heat-linked events.
-9. Historian latest-value query returns live tags.
-10. Historian tag-sample query returns time-series samples.
-11. Alarm query responds successfully, including an empty list when there are no alarms.
+1. `steelmaking-level2-api` starts with Django/DRF and becomes healthy.
+2. `/health` reports database connectivity and `api_version=v1`.
+3. `/api/v1/meta` reports `framework=django-rest-framework`.
+4. Existing EAF/LF/CCM equipment and steel-grade queries remain readable.
+5. An active simulated Heat can be retrieved.
+6. Heat overview includes live process values and events.
+7. Event, alarm and historian queries retain the previous API behavior.
+8. Swagger/OpenAPI are available.
+9. The existing smoke test passes unchanged.
 
 Automated local verification:
 
 ```bash
+docker compose up -d --build level2-api
 python3 scripts/level2_api_smoke_test.py
 ```
 
@@ -146,17 +116,11 @@ LEVEL 2 API SMOKE TEST
 Result: PASS
 ```
 
-## Client/site dependencies still pending
+## Next Django work packages
 
-This milestone does not include:
-
-- Authentication/SSO
-- TLS termination and production reverse proxy
-- Final production CORS policy
-- Plant network/firewall configuration
-- Level 3/MES write adapters
-- Real PLC tag validation
-- Production server deployment
-- SAT/commissioning
-
-Those items remain part of later site-integration and production deployment phases.
+- Define Django models for master data and transactional Level 2 entities.
+- Add users, plant roles and permissions.
+- Configure Django Admin for equipment, grades and configuration data.
+- Add JWT/SSO authentication for operator/dashboard clients.
+- Move orchestration workflows that belong to the main platform into Django services.
+- Keep real-time ingestion, simulation and focused calculation microservices in FastAPI.

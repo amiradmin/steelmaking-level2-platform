@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
 import time
 import urllib.error
@@ -9,7 +10,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 
-BASE_URL = "http://localhost:8000"
+BASE_URL = os.getenv("HEAT_MANAGEMENT_URL", "http://localhost:9000")
 
 
 def request_json(method: str, path: str, payload: dict[str, Any] | None = None) -> Any:

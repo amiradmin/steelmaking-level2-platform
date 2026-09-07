@@ -8,7 +8,7 @@ from urllib.error import URLError
 from urllib.request import urlopen
 
 
-BASE_URL = os.getenv("HEAT_MANAGEMENT_URL", "http://127.0.0.1:8000")
+BASE_URL = os.getenv("HEAT_MANAGEMENT_URL", "http://127.0.0.1:9000")
 
 
 def get_json(path: str):

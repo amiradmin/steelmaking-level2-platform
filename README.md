@@ -73,8 +73,8 @@ docker compose up -d --build
 Default services:
 
 - PostgreSQL / TimescaleDB: `localhost:5432`
-- Heat Management API: `http://localhost:8000`
-- OpenAPI/Swagger: `http://localhost:8000/docs`
+- Heat Management API: `http://localhost:9000`
+- OpenAPI/Swagger: `http://localhost:9000/docs`
 - Level 1 simulator: internal Docker service writing live samples to the historian
 
 Verify containers:

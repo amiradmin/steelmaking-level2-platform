@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 
 from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncWebsocketConsumer
@@ -13,6 +14,7 @@ from rest_framework_simplejwt.exceptions import AuthenticationFailed, InvalidTok
 from .telemetry import build_dashboard_snapshot
 
 
+LOGGER = logging.getLogger("level2-api.telemetry")
 JWT_SUBPROTOCOL = "level2.jwt"
 
 
@@ -79,12 +81,13 @@ class TelemetryConsumer(AsyncWebsocketConsumer):
                 )
             except asyncio.CancelledError:
                 raise
-            except Exception as exc:  # keep the socket alive through transient DB errors
+            except Exception:
+                LOGGER.exception("Realtime telemetry snapshot failed")
                 await self.send(
                     text_data=json.dumps(
                         {
                             "type": "telemetry.error",
-                            "detail": str(exc),
+                            "detail": "Telemetry source unavailable",
                         }
                     )
                 )

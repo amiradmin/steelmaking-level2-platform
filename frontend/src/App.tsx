@@ -318,7 +318,7 @@ function Dashboard({ theme, onThemeChange, onLogout, initialOperator }: { theme:
           {error && <div className="api-notice"><Icon name="alarm" /><span>{error}</span></div>}
 
           <section className="kpi-grid" aria-label="Key process indicators">
-            <article className="kpi-card accent-orange"><div className="kpi-icon"><Icon name="heat" /></div><span>Current Active Heat</span><strong>{loading ? '…' : `#${activeHeat?.heat_no ?? '—'}`}</strong><small>Grade: {activeHeat?.grade_code ?? '—'} <b>T+42 min</b></small></article>
+            <article className="kpi-card accent-primary"><div className="kpi-icon"><Icon name="heat" /></div><span>Current Active Heat</span><strong>{loading ? '…' : `#${activeHeat?.heat_no ?? '—'}`}</strong><small>Grade: {activeHeat?.grade_code ?? '—'} <b>T+42 min</b></small></article>
             <article className="kpi-card accent-cyan"><div className="kpi-icon"><Icon name="ladle" /></div><span>Active Metallurgy Station</span><strong>{activeHeat?.status ?? 'LF-1'}</strong><small>Precision Alloying <b>RUNNING</b></small></article>
             <article className="kpi-card accent-amber"><div className="kpi-icon"><Icon name="clock" /></div><span>Tap-to-Tap Cycle Time</span><strong>54 <i>min</i></strong><small>Target: 52 min <b>+2 min</b></small></article>
             <article className="kpi-card accent-cyan"><div className="kpi-icon"><Icon name="temperature" /></div><span>Molten Bath Temperature</span><strong>1,624 <i>°C</i></strong><small>Optimal range 1615–1630 <b>OPTIMAL</b></small></article>

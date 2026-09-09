@@ -67,8 +67,8 @@ export async function login(username: string, password: string, remember: boolea
   const body = await responseBody(response)
   if (!response.ok || typeof body.access !== 'string' || typeof body.refresh !== 'string') {
     throw new Error(response.status === 401
-      ? 'کد کاربری یا رمز عبور صحیح نیست.'
-      : 'سرویس احراز هویت در دسترس نیست؛ دوباره تلاش کنید.')
+      ? 'The employee ID or password is incorrect.'
+      : 'The authentication service is unavailable. Please try again.')
   }
 
   saveTokens({ access: body.access, refresh: body.refresh }, remember)

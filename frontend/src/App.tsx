@@ -82,17 +82,17 @@ const demoHeats: Heat[] = [
 ]
 
 const navItems: Array<{ icon: IconName; label: string; badge?: string }> = [
-  { icon: 'dashboard', label: 'نمای کلی' },
-  { icon: 'heat', label: 'ردیابی ذوب', badge: 'H-4082' },
-  { icon: 'bolt', label: 'کوره قوس الکتریکی (EAF)' },
-  { icon: 'ladle', label: 'کوره پاتیلی (LF)' },
-  { icon: 'cast', label: 'ریخته‌گری مداوم (CCM)' },
-  { icon: 'inventory', label: 'مواد اولیه و شارژ' },
-  { icon: 'history', label: 'بایگانی داده (Historian)' },
-  { icon: 'chart', label: 'گزارش‌ها و تحلیل' },
-  { icon: 'alarm', label: 'مدیریت هشدارها', badge: '۳' },
-  { icon: 'link', label: 'ارتباطات L1 / L3' },
-  { icon: 'settings', label: 'تنظیمات سیستم' },
+  { icon: 'dashboard', label: 'Overview' },
+  { icon: 'heat', label: 'Heat Tracking', badge: 'H-4082' },
+  { icon: 'bolt', label: 'Electric Arc Furnace (EAF)' },
+  { icon: 'ladle', label: 'Ladle Furnace (LF)' },
+  { icon: 'cast', label: 'Continuous Casting (CCM)' },
+  { icon: 'inventory', label: 'Raw Materials & Charging' },
+  { icon: 'history', label: 'Data Historian' },
+  { icon: 'chart', label: 'Reports & Analytics' },
+  { icon: 'alarm', label: 'Alarm Management', badge: '3' },
+  { icon: 'link', label: 'L1 / L3 Communications' },
+  { icon: 'settings', label: 'System Settings' },
 ]
 
 function getInitialTheme(): Theme {
@@ -103,7 +103,7 @@ function getInitialTheme(): Theme {
 
 function ThemeToggle({ theme, onChange }: { theme: Theme; onChange: () => void }) {
   return (
-    <button className="icon-button theme-toggle" type="button" onClick={onChange} aria-label="تغییر حالت نمایش" title="تغییر حالت روشن و تاریک">
+    <button className="icon-button theme-toggle" type="button" onClick={onChange} aria-label="Change color theme" title="Toggle light and dark mode">
       <Icon name={theme === 'dark' ? 'sun' : 'moon'} />
     </button>
   )
@@ -112,8 +112,8 @@ function ThemeToggle({ theme, onChange }: { theme: Theme; onChange: () => void }
 function Brand({ compact = false }: { compact?: boolean }) {
   return (
     <div className={`brand ${compact ? 'brand-compact' : ''}`}>
-      <span className="logo-frame"><img src="/mianeh-steel-logo.png" alt="لوگوی مجتمع فولاد میانه" /></span>
-      <span className="brand-copy"><strong>مجتمع فولاد میانه</strong><small>سامانه سطح ۲ فولادسازی</small></span>
+      <span className="logo-frame"><img src="/mianeh-steel-logo.png" alt="Mianeh Steel Complex logo" /></span>
+      <span className="brand-copy"><strong>Mianeh Steel Complex</strong><small>Level 2 Steelmaking System</small></span>
     </div>
   )
 }
@@ -129,7 +129,7 @@ function LoginPage({ theme, onThemeChange, onLogin }: { theme: Theme; onThemeCha
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!employeeId.trim() || !password.trim()) {
-      setFormError('کد کاربری و رمز عبور را وارد کنید.')
+      setFormError('Enter your employee ID and password.')
       return
     }
     setFormError('')
@@ -137,7 +137,7 @@ function LoginPage({ theme, onThemeChange, onLogin }: { theme: Theme; onThemeCha
     try {
       await onLogin(employeeId.trim(), password, remember)
     } catch (error) {
-      setFormError(error instanceof Error ? error.message : 'ورود به سامانه انجام نشد.')
+      setFormError(error instanceof Error ? error.message : 'Unable to sign in to the system.')
     } finally {
       setSubmitting(false)
     }
@@ -148,10 +148,8 @@ function LoginPage({ theme, onThemeChange, onLogin }: { theme: Theme; onThemeCha
       <header className="login-header">
         <Brand compact />
         <div className="login-header-actions">
-          <span className="shift-chip"><Icon name="clock" size={16} /> شیفت ب · صبح‌کار</span>
-          <span className="date-chip">۱۴۰۵/۰۶/۱۶ · ۱۱:۴۰</span>
-          <button className="language-button active" type="button">FA</button>
-          <button className="language-button" type="button">EN</button>
+          <span className="shift-chip"><Icon name="clock" size={16} /> Shift B · Morning</span>
+          <span className="date-chip">Sep 7, 2026 · 11:40</span>
           <ThemeToggle theme={theme} onChange={onThemeChange} />
         </div>
       </header>
@@ -159,54 +157,54 @@ function LoginPage({ theme, onThemeChange, onLogin }: { theme: Theme; onThemeCha
       <section className="login-stage">
         <div className="metallurgy-visual" aria-hidden="true">
           <div className="visual-kicker">METALLURGICAL STATUS FEED</div>
-          <h1>پایش، ردیابی و بهینه‌سازی<br />فرایند تولید</h1>
+          <h1>Monitor, Track, and Optimize<br />the Production Process</h1>
           <div className="ladle-illustration">
-            <span className="temperature-readout">۱۶۲۸٫۴ <small>°C</small></span>
+            <span className="temperature-readout">1,628.4 <small>°C</small></span>
             <div className="ladle-glow" />
             <div className="ladle-vessel"><span /></div>
           </div>
           <div className="visual-stats">
-            <div><span>فشار آرگون</span><strong>240.8 <small>Nm³/h</small></strong><em>STABLE PURGE</em></div>
-            <div><span>توان ترانسفورماتور</span><strong>84.2 <small>MW</small></strong><em>ARC ON</em></div>
-            <div><span>شماره ذوب جاری</span><strong>H-4082</strong><em>3SP-MOD</em></div>
+            <div><span>Argon Flow</span><strong>240.8 <small>Nm³/h</small></strong><em>STABLE PURGE</em></div>
+            <div><span>Transformer Power</span><strong>84.2 <small>MW</small></strong><em>ARC ON</em></div>
+            <div><span>Current Heat</span><strong>H-4082</strong><em>3SP-MOD</em></div>
           </div>
         </div>
 
         <div className="login-panel">
           <div className="panel-brand"><Brand /></div>
           <div className="login-title-row">
-            <div><span className="section-kicker">احراز هویت کنسول متالورژی</span><h2>ورود به کنسول عملیات</h2></div>
+            <div><span className="section-kicker">METALLURGY CONSOLE AUTHENTICATION</span><h2>Sign in to Operations</h2></div>
             <span className="terminal-id">WS-CR-04</span>
           </div>
           <form onSubmit={submit} noValidate>
-            <label className="form-label" htmlFor="workstation">ایستگاه کاری / زون متالورژی</label>
+            <label className="form-label" htmlFor="workstation">Workstation / Metallurgy Zone</label>
             <select id="workstation" defaultValue="CCR-1">
-              <option value="CCR-1">کنترل روم مرکزی کارگاه ذوب ۱ (CCR-1)</option>
-              <option value="EAF-01">کوره قوس الکتریکی شماره ۱ (EAF-01)</option>
-              <option value="LF-01">کوره پاتیلی و تصفیه ثانویه (LF-01)</option>
-              <option value="CCM-02">ماشین ریخته‌گری پیوسته (CCM-02)</option>
+              <option value="CCR-1">Steelmaking Shop 1 Central Control Room (CCR-1)</option>
+              <option value="EAF-01">Electric Arc Furnace No. 1 (EAF-01)</option>
+              <option value="LF-01">Ladle Furnace & Secondary Metallurgy (LF-01)</option>
+              <option value="CCM-02">Continuous Casting Machine (CCM-02)</option>
             </select>
 
-            <label className="form-label" htmlFor="employee-id">کد کاربری / شماره پرسنلی</label>
+            <label className="form-label" htmlFor="employee-id">Employee ID / Personnel Number</label>
             <div className="input-with-icon"><Icon name="user" /><input id="employee-id" value={employeeId} onChange={(event) => setEmployeeId(event.target.value)} autoComplete="username" /></div>
 
-            <div className="label-row"><label className="form-label" htmlFor="password">رمز عبور امنیتی</label><button type="button" className="text-button">بازیابی گذرواژه</button></div>
-            <div className="input-with-icon"><Icon name="settings" /><input id="password" type={showPassword ? 'text' : 'password'} value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" placeholder="رمز عبور" /><button type="button" className="show-password" onClick={() => setShowPassword((value) => !value)}>{showPassword ? 'پنهان' : 'نمایش'}</button></div>
+            <div className="label-row"><label className="form-label" htmlFor="password">Password</label><button type="button" className="text-button">Recover Password</button></div>
+            <div className="input-with-icon"><Icon name="settings" /><input id="password" type={showPassword ? 'text' : 'password'} value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" placeholder="Password" /><button type="button" className="show-password" onClick={() => setShowPassword((value) => !value)}>{showPassword ? 'Hide' : 'Show'}</button></div>
 
-            <label className="remember-row"><input type="checkbox" checked={remember} onChange={(event) => setRemember(event.target.checked)} /><span>به‌خاطرسپاری این ایستگاه کاری</span><small>TLS 1.3 / JWT</small></label>
+            <label className="remember-row"><input type="checkbox" checked={remember} onChange={(event) => setRemember(event.target.checked)} /><span>Remember this workstation</span><small>TLS 1.3 / JWT</small></label>
             {formError && <p className="form-error" role="alert">{formError}</p>}
-            <button className="login-button" type="submit" disabled={submitting}><Icon name="logout" /> {submitting ? 'در حال احراز هویت…' : 'ورود به کنسول عملیات'}</button>
+            <button className="login-button" type="submit" disabled={submitting}><Icon name="logout" /> {submitting ? 'Authenticating…' : 'Sign in to Operations'}</button>
           </form>
-          <div className="support-row"><span>پشتیبانی فنی شیفت: داخلی ۴۲۱۸</span><span>نسخه ۲.۸.۴</span></div>
+          <div className="support-row"><span>Shift technical support: Ext. 4218</span><span>Version 2.8.4</span></div>
         </div>
       </section>
 
-      <section className="diagnostics" aria-label="وضعیت زیرساخت اتوماسیون">
-        <div className="diagnostics-heading"><div><span className="status-dot online" /><strong>وضعیت برخط زیرساخت اتوماسیون</strong></div><span>HEARTBEAT: ALL ACTIVE</span></div>
+      <section className="diagnostics" aria-label="Automation infrastructure status">
+        <div className="diagnostics-heading"><div><span className="status-dot online" /><strong>Automation Infrastructure Online</strong></div><span>HEARTBEAT: ALL ACTIVE</span></div>
         <div className="diagnostic-grid">
-          <article><span className="diag-icon"><Icon name="link" /></span><div><small>اتصال سطح ۱ (PLC / SCADA)</small><strong>L1 BUS · 4 ms</strong><em>Profinet پایدار</em></div></article>
-          <article><span className="diag-icon"><Icon name="history" /></span><div><small>پایگاه داده وقایع</small><strong>Historian L2</strong><em>12.4k tags/sec</em></div></article>
-          <article><span className="diag-icon"><Icon name="chart" /></span><div><small>یکپارچه‌سازی سطح ۳</small><strong>MES / ERP · Active</strong><em>دستور تولید همگام</em></div></article>
+          <article><span className="diag-icon"><Icon name="link" /></span><div><small>Level 1 Connection (PLC / SCADA)</small><strong>L1 BUS · 4 ms</strong><em>PROFINET STABLE</em></div></article>
+          <article><span className="diag-icon"><Icon name="history" /></span><div><small>Event Database</small><strong>Historian L2</strong><em>12.4k tags/sec</em></div></article>
+          <article><span className="diag-icon"><Icon name="chart" /></span><div><small>Level 3 Integration</small><strong>MES / ERP · Active</strong><em>PRODUCTION ORDER SYNCED</em></div></article>
         </div>
       </section>
     </main>
@@ -215,7 +213,7 @@ function LoginPage({ theme, onThemeChange, onLogin }: { theme: Theme; onThemeCha
 
 function MiniTrend() {
   return (
-    <svg className="trend-chart" viewBox="0 0 760 230" preserveAspectRatio="none" role="img" aria-label="نمودار روند زنده پارامترهای فرایند">
+    <svg className="trend-chart" viewBox="0 0 760 230" preserveAspectRatio="none" role="img" aria-label="Live process parameter trend chart">
       <g className="chart-grid"><path d="M0 30H760M0 80H760M0 130H760M0 180H760"/><path d="M120 0V210M280 0V210M440 0V210M600 0V210"/></g>
       <path className="trend-line temperature" d="M0 176 C70 168 95 122 160 130 S260 155 320 104 S430 78 480 96 S575 42 650 68 S720 40 760 36" />
       <path className="trend-line power" d="M0 192 C75 178 110 184 170 158 S280 120 335 142 S435 160 505 122 S620 108 680 126 S730 112 760 116" />
@@ -226,7 +224,7 @@ function MiniTrend() {
 }
 
 function StatusBadge({ status }: { status: string }) {
-  const labels: Record<string, string> = { LF: 'تصفیه نهایی', CASTING: 'در حال ریخته‌گری', COMPLETED: 'تکمیل شده', EAF: 'در حال ذوب', TAPPING: 'تخلیه', CHARGING: 'شارژ' }
+  const labels: Record<string, string> = { LF: 'Final Refining', CASTING: 'Casting', COMPLETED: 'Completed', EAF: 'Melting', TAPPING: 'Tapping', CHARGING: 'Charging' }
   return <span className={`status-badge status-${status.toLowerCase()}`}>{labels[status] ?? status}</span>
 }
 
@@ -272,7 +270,7 @@ function Dashboard({ theme, onThemeChange, onLogout, initialOperator }: { theme:
             onLogout()
             return
           }
-          setError('ارتباط با API برقرار نیست؛ داده‌های نمایشی آخرین همگام‌سازی نمایش داده می‌شود.')
+          setError('The API is unavailable. Showing demo data from the latest synchronization.')
           setHeats(demoHeats)
         }
       })
@@ -288,81 +286,80 @@ function Dashboard({ theme, onThemeChange, onLogout, initialOperator }: { theme:
       <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
         <div className="sidebar-brand"><Brand /></div>
         <div className="link-health"><span className="status-dot online" /><span><strong>L1 / L2 LINK: ACTIVE</strong><small>2.1 ms · REALTIME</small></span></div>
-        <nav className="side-nav" aria-label="ناوبری سامانه">
+        <nav className="side-nav" aria-label="System navigation">
           {navItems.map((item, index) => <button className={index === 0 ? 'active' : ''} type="button" key={item.label}><Icon name={item.icon} /><span>{item.label}</span>{item.badge && <em>{item.badge}</em>}</button>)}
         </nav>
-        <div className="sidebar-footer"><button type="button"><Icon name="settings" /> پشتیبانی فنی شیفت</button><button type="button" onClick={onLogout}><Icon name="logout" /> خروج از سامانه</button></div>
+        <div className="sidebar-footer"><button type="button"><Icon name="settings" /> Shift Technical Support</button><button type="button" onClick={onLogout}><Icon name="logout" /> Sign Out</button></div>
       </aside>
-      {sidebarOpen && <button className="sidebar-scrim" type="button" onClick={() => setSidebarOpen(false)} aria-label="بستن منو" />}
+      {sidebarOpen && <button className="sidebar-scrim" type="button" onClick={() => setSidebarOpen(false)} aria-label="Close menu" />}
 
       <main className="dashboard-main">
         <header className="dashboard-topbar">
           <div className="dashboard-context">
-            <button className="mobile-menu icon-button" type="button" onClick={() => setSidebarOpen((value) => !value)} aria-label="نمایش منو"><Icon name="menu" /></button>
+            <button className="mobile-menu icon-button" type="button" onClick={() => setSidebarOpen((value) => !value)} aria-label="Open menu"><Icon name="menu" /></button>
             <span className="plant-mark">M</span>
-            <span><strong>کارگاه ذوب شماره ۱</strong><small>شیفت ب · صبح‌کار</small></span>
+            <span><strong>Steelmaking Shop No. 1</strong><small>Shift B · Morning</small></span>
           </div>
           <div className="topbar-actions">
-            <span className="live-chip"><span className="status-dot online" /> پخش زنده تله‌متری <b>LIVE</b></span>
-            <label className="search-box"><Icon name="search" /><input placeholder="جستجوی ذوب، گرید یا پاتیل..." /></label>
+            <span className="live-chip"><span className="status-dot online" /> Live Telemetry <b>LIVE</b></span>
+            <label className="search-box"><Icon name="search" /><input placeholder="Search heat, grade, or ladle..." /></label>
             <ThemeToggle theme={theme} onChange={onThemeChange} />
-            <button className="icon-button notification-button" type="button" aria-label="هشدارها"><Icon name="bell" /><i>3</i></button>
-            <button className="language-button active" type="button">FA</button>
-            <div className="operator"><span><strong>{operator?.display_name ?? operator?.username ?? 'اپراتور Level 2'}</strong><small>کاربر احرازشده سامانه</small></span><span className="operator-avatar"><Icon name="user" /></span></div>
+            <button className="icon-button notification-button" type="button" aria-label="Notifications"><Icon name="bell" /><i>3</i></button>
+            <div className="operator"><span><strong>{operator?.username ?? operator?.display_name ?? 'Level 2 Operator'}</strong><small>Authenticated User</small></span><span className="operator-avatar"><Icon name="user" /></span></div>
           </div>
         </header>
 
         <div className="dashboard-content">
           <div className="page-heading">
-            <div><span className="section-kicker">LEVEL 2 OPERATIONS</span><h1>نمای کلی عملیات فولادسازی</h1><p>پایش یکپارچه مسیر تولید از کوره قوس تا ریخته‌گری مداوم</p></div>
-            <div className="update-state"><span className={`status-dot ${error ? 'warning' : 'online'}`} /><span><strong>{error ? 'حالت داده نمایشی' : 'همگام با Level 1'}</strong><small>آخرین بروزرسانی: همین حالا</small></span></div>
+            <div><span className="section-kicker">LEVEL 2 OPERATIONS</span><h1>Steelmaking Operations Overview</h1><p>Integrated production monitoring from the electric arc furnace to continuous casting</p></div>
+            <div className="update-state"><span className={`status-dot ${error ? 'warning' : 'online'}`} /><span><strong>{error ? 'Demo Data Mode' : 'Synced with Level 1'}</strong><small>Last updated: just now</small></span></div>
           </div>
 
           {error && <div className="api-notice"><Icon name="alarm" /><span>{error}</span></div>}
 
-          <section className="kpi-grid" aria-label="شاخص‌های کلیدی فرایند">
-            <article className="kpi-card accent-orange"><div className="kpi-icon"><Icon name="heat" /></div><span>ذوب فعال جاری</span><strong>{loading ? '…' : `#${activeHeat?.heat_no ?? '—'}`}</strong><small>گرید: {activeHeat?.grade_code ?? '—'} <b>T+42 min</b></small></article>
-            <article className="kpi-card accent-cyan"><div className="kpi-icon"><Icon name="ladle" /></div><span>ایستگاه متالورژی فعال</span><strong>{activeHeat?.status ?? 'LF-1'}</strong><small>آلیاژسازی دقیق <b>RUNNING</b></small></article>
-            <article className="kpi-card accent-amber"><div className="kpi-icon"><Icon name="clock" /></div><span>زمان چرخه Tap-to-Tap</span><strong>۵۴ <i>دقیقه</i></strong><small>هدف: ۵۲ min <b>+2 min</b></small></article>
-            <article className="kpi-card accent-cyan"><div className="kpi-icon"><Icon name="temperature" /></div><span>دمای حمام مذاب</span><strong>۱٬۶۲۴ <i>°C</i></strong><small>بازه مطلوب ۱۶۱۵–۱۶۳۰ <b>مطلوب</b></small></article>
-            <article className="kpi-card accent-blue"><div className="kpi-icon"><Icon name="energy" /></div><span>مصرف ویژه انرژی</span><strong>۳۹۸ <i>kWh/t</i></strong><small>میانگین شیفت <b>−3.4%</b></small></article>
-            <article className="kpi-card accent-red"><div className="kpi-icon"><Icon name="yield" /></div><span>راندمان و هشدارها</span><strong>۹۶٫۸ <i>%</i></strong><small>{Math.max(alarms.length, 3)} هشدار فعال <b>۱ بحرانی</b></small></article>
+          <section className="kpi-grid" aria-label="Key process indicators">
+            <article className="kpi-card accent-orange"><div className="kpi-icon"><Icon name="heat" /></div><span>Current Active Heat</span><strong>{loading ? '…' : `#${activeHeat?.heat_no ?? '—'}`}</strong><small>Grade: {activeHeat?.grade_code ?? '—'} <b>T+42 min</b></small></article>
+            <article className="kpi-card accent-cyan"><div className="kpi-icon"><Icon name="ladle" /></div><span>Active Metallurgy Station</span><strong>{activeHeat?.status ?? 'LF-1'}</strong><small>Precision Alloying <b>RUNNING</b></small></article>
+            <article className="kpi-card accent-amber"><div className="kpi-icon"><Icon name="clock" /></div><span>Tap-to-Tap Cycle Time</span><strong>54 <i>min</i></strong><small>Target: 52 min <b>+2 min</b></small></article>
+            <article className="kpi-card accent-cyan"><div className="kpi-icon"><Icon name="temperature" /></div><span>Molten Bath Temperature</span><strong>1,624 <i>°C</i></strong><small>Optimal range 1615–1630 <b>OPTIMAL</b></small></article>
+            <article className="kpi-card accent-blue"><div className="kpi-icon"><Icon name="energy" /></div><span>Specific Energy Consumption</span><strong>398 <i>kWh/t</i></strong><small>Shift average <b>−3.4%</b></small></article>
+            <article className="kpi-card accent-red"><div className="kpi-icon"><Icon name="yield" /></div><span>Yield & Alarms</span><strong>96.8 <i>%</i></strong><small>{Math.max(alarms.length, 3)} active alarms <b>1 CRITICAL</b></small></article>
           </section>
 
           <section className="panel process-panel">
-            <div className="panel-heading"><div><span className="section-kicker">HEAT TRACKING TIMELINE</span><h2>خط پیوسته فرایند ذوب و تولید شمش</h2></div><span className="sync-badge"><Icon name="check" /> توالی همگام · +۴ دقیقه</span></div>
+            <div className="panel-heading"><div><span className="section-kicker">HEAT TRACKING TIMELINE</span><h2>Continuous Melting and Billet Production Flow</h2></div><span className="sync-badge"><Icon name="check" /> Sequence Synced · +4 min</span></div>
             <div className="process-flow">
-              <article className="process-card"><div className="process-card-top"><span className="stage-number">۰۱</span><span className="equipment-icon"><Icon name="bolt" /></span><StatusBadge status="EAF" /></div><h3>کوره قوس الکتریکی</h3><code>EAF-1 · NEXT #H-4083</code><dl><div><dt>مرحله جاری</dt><dd>شارژ سبد دوم قراضه</dd></div><div><dt>توان اکتیو</dt><dd>82.4 MW</dd></div></dl><div className="progress"><span style={{ width: '65%' }} /></div><small>پیشرفت ذوب ۶۵٪ · تخلیه ۱۴:۴۸</small></article>
+              <article className="process-card"><div className="process-card-top"><span className="stage-number">01</span><span className="equipment-icon"><Icon name="bolt" /></span><StatusBadge status="EAF" /></div><h3>Electric Arc Furnace</h3><code>EAF-1 · NEXT #H-4083</code><dl><div><dt>Current Stage</dt><dd>Second Scrap Basket Charging</dd></div><div><dt>Active Power</dt><dd>82.4 MW</dd></div></dl><div className="progress"><span style={{ width: '65%' }} /></div><small>Melting progress 65% · Tapping at 14:48</small></article>
               <span className="flow-arrow"><Icon name="arrow" /></span>
-              <article className="process-card current"><div className="process-card-top"><span className="stage-number">۰۲</span><span className="equipment-icon"><Icon name="ladle" /></span><StatusBadge status="LF" /></div><h3>کوره پاتیلی</h3><code>LF-1 · HEAT #H-4082</code><dl><div><dt>دمای مذاب</dt><dd>1624 °C</dd></div><div><dt>دمش آرگون</dt><dd>برقرار</dd></div></dl><div className="progress"><span style={{ width: '85%' }} /></div><small>تکمیل متالورژی ۸۵٪ · آماده CCM در ۷ دقیقه</small></article>
+              <article className="process-card current"><div className="process-card-top"><span className="stage-number">02</span><span className="equipment-icon"><Icon name="ladle" /></span><StatusBadge status="LF" /></div><h3>Ladle Furnace</h3><code>LF-1 · HEAT #H-4082</code><dl><div><dt>Steel Temperature</dt><dd>1624 °C</dd></div><div><dt>Argon Stirring</dt><dd>Active</dd></div></dl><div className="progress"><span style={{ width: '85%' }} /></div><small>Metallurgy 85% complete · CCM ready in 7 min</small></article>
               <span className="flow-arrow"><Icon name="arrow" /></span>
-              <article className="process-card"><div className="process-card-top"><span className="stage-number">۰۳</span><span className="equipment-icon"><Icon name="cast" /></span><StatusBadge status="CASTING" /></div><h3>ریخته‌گری مداوم</h3><code>CCM-2 · CASTING #H-4081</code><dl><div><dt>سرعت کشش</dt><dd>1.45 m/min</dd></div><div><dt>تناژ تاندیش</dt><dd>24.2 t</dd></div></dl><div className="progress"><span style={{ width: '52%' }} /></div><small>پاتیل ۳ از ۶ · چهار خط فعال</small></article>
+              <article className="process-card"><div className="process-card-top"><span className="stage-number">03</span><span className="equipment-icon"><Icon name="cast" /></span><StatusBadge status="CASTING" /></div><h3>Continuous Casting</h3><code>CCM-2 · CASTING #H-4081</code><dl><div><dt>Casting Speed</dt><dd>1.45 m/min</dd></div><div><dt>Tundish Weight</dt><dd>24.2 t</dd></div></dl><div className="progress"><span style={{ width: '52%' }} /></div><small>Ladle 3 of 6 · Four strands active</small></article>
             </div>
           </section>
 
           <div className="dashboard-grid">
             <section className="panel trend-panel">
-              <div className="panel-heading"><div><span className="section-kicker">REALTIME TREND · 60 MIN</span><h2>پارامترهای آنلاین ذوب {activeHeat?.heat_no ?? 'H-4082'}</h2></div><button className="outline-button" type="button">زوم ۱ ساعت</button></div>
-              <div className="chart-legend"><span className="temperature">دمای مذاب (°C)</span><span className="power">توان الکتریکی (MW)</span><span className="argon">دمش آرگون (Nm³/h)</span></div>
+              <div className="panel-heading"><div><span className="section-kicker">REALTIME TREND · 60 MIN</span><h2>Live Parameters for Heat {activeHeat?.heat_no ?? 'H-4082'}</h2></div><button className="outline-button" type="button">1 Hour Zoom</button></div>
+              <div className="chart-legend"><span className="temperature">Steel Temperature (°C)</span><span className="power">Electrical Power (MW)</span><span className="argon">Argon Flow (Nm³/h)</span></div>
               <MiniTrend />
-              <div className="chart-axis"><span>۱۳:۲۰</span><span>۱۳:۳۵</span><span>۱۳:۵۰</span><span>۱۴:۰۵</span><span>۱۴:۲۲ · NOW</span></div>
-              <div className="live-metrics"><div><small>دمای حمام مذاب</small><strong>1,624.8 °C</strong><em>+12°C / 10min</em></div><div><small>فشار گاز آرگون</small><strong>6.4 bar</strong><em>180 Nl/min</em></div><div><small>کربن معادل</small><strong>0.182%</strong><em>O₂: 24 ppm</em></div><div><small>عمر نسوز پاتیل</small><strong>42 ذوب</strong><em>مطلوب</em></div></div>
+              <div className="chart-axis"><span>13:20</span><span>13:35</span><span>13:50</span><span>14:05</span><span>14:22 · NOW</span></div>
+              <div className="live-metrics"><div><small>Molten Bath Temperature</small><strong>1,624.8 °C</strong><em>+12°C / 10min</em></div><div><small>Argon Gas Pressure</small><strong>6.4 bar</strong><em>180 Nl/min</em></div><div><small>Carbon Equivalent</small><strong>0.182%</strong><em>O₂: 24 ppm</em></div><div><small>Ladle Refractory Life</small><strong>42 heats</strong><em>OPTIMAL</em></div></div>
             </section>
 
             <section className="panel alarm-panel">
-              <div className="panel-heading"><div><span className="section-kicker">ACTIVE ALARMS</span><h2>هشدارهای فرایندی</h2></div><span className="alarm-count">۳ فعال</span></div>
+              <div className="panel-heading"><div><span className="section-kicker">ACTIVE ALARMS</span><h2>Process Alarms</h2></div><span className="alarm-count">3 ACTIVE</span></div>
               <div className="alarm-list">
-                <article className="alarm-item critical"><div className="alarm-title"><span><Icon name="alarm" /> بحرانی · EAF-1</span><time>۱۴:۱۹:۳۲</time></div><strong>افزایش دمای پانل خنک‌کننده سقف</strong><p>اختلاف دمای رفت و برگشت آبگرد بیشتر از ۱۸°C است.</p><button type="button">تأیید هشدار (ACK)</button></article>
-                <article className="alarm-item warning"><div className="alarm-title"><span><Icon name="alarm" /> هشدار · LF-1</span><time>۱۴:۰۵:۱۱</time></div><strong>انحراف نسبت بازیسیته سرباره</strong><p>نسبت CaO/SiO₂ برابر 2.45؛ حداقل مجاز 2.8.</p><button type="button">بررسی دستور شارژ</button></article>
-                <article className="alarm-item info"><div className="alarm-title"><span><Icon name="check" /> رویداد · CCM</span><time>۱۳:۵۸:۰۴</time></div><strong>استقرار پاتیل جدید توالی ذوب</strong><p>پاتیل H-4081 با موفقیت روی تارت گردان مستقر شد.</p></article>
+                <article className="alarm-item critical"><div className="alarm-title"><span><Icon name="alarm" /> CRITICAL · EAF-1</span><time>14:19:32</time></div><strong>Roof Cooling Panel Temperature High</strong><p>Cooling-water supply and return temperature difference exceeds 18°C.</p><button type="button">Acknowledge Alarm (ACK)</button></article>
+                <article className="alarm-item warning"><div className="alarm-title"><span><Icon name="alarm" /> WARNING · LF-1</span><time>14:05:11</time></div><strong>Slag Basicity Ratio Deviation</strong><p>CaO/SiO₂ ratio is 2.45; minimum allowed value is 2.8.</p><button type="button">Review Charging Recipe</button></article>
+                <article className="alarm-item info"><div className="alarm-title"><span><Icon name="check" /> EVENT · CCM</span><time>13:58:04</time></div><strong>New Sequence Ladle Positioned</strong><p>Ladle H-4081 was positioned successfully on the turret.</p></article>
               </div>
             </section>
           </div>
 
           <section className="panel heats-panel">
-            <div className="panel-heading"><div><span className="section-kicker">PRODUCTION RECORD</span><h2>کارنامه متالورژیکی ذوب‌های اخیر</h2></div><button className="outline-button" type="button">مشاهده آرشیو</button></div>
-            <div className="table-wrap"><table><thead><tr><th>شماره ذوب</th><th>گرید فولاد</th><th>مسیر تولید</th><th>وزن واقعی</th><th>دمای تخلیه</th><th>وضعیت کیفی</th></tr></thead><tbody>{heats.slice(0, 6).map((heat) => <tr key={heat.heat_no}><td className="heat-no">#{heat.heat_no}</td><td>{heat.grade_code ?? '—'}</td><td><code>EAF1 › LF1 › CCM2</code></td><td>{heat.actual_weight_t ?? heat.planned_weight_t ?? '—'} t</td><td>{heat.status === 'COMPLETED' ? '۱۶۳۲' : '۱۶۲۴'} °C</td><td><StatusBadge status={heat.status} /></td></tr>)}</tbody></table></div>
-            <div className="table-summary"><span>مجموع تناژ شیفت: <strong>۵۲۰٫۶ تن</strong></span><span>میانگین انحراف دما: <strong>±۳٫۲°C</strong></span><span>ذوب‌های پاس‌شده: <strong>۹ پاتیل</strong></span></div>
+            <div className="panel-heading"><div><span className="section-kicker">PRODUCTION RECORD</span><h2>Recent Heat Metallurgical Record</h2></div><button className="outline-button" type="button">View Archive</button></div>
+            <div className="table-wrap"><table><thead><tr><th>Heat Number</th><th>Steel Grade</th><th>Production Route</th><th>Actual Weight</th><th>Tap Temperature</th><th>Quality Status</th></tr></thead><tbody>{heats.slice(0, 6).map((heat) => <tr key={heat.heat_no}><td className="heat-no">#{heat.heat_no}</td><td>{heat.grade_code ?? '—'}</td><td><code>EAF1 › LF1 › CCM2</code></td><td>{heat.actual_weight_t ?? heat.planned_weight_t ?? '—'} t</td><td>{heat.status === 'COMPLETED' ? '1632' : '1624'} °C</td><td><StatusBadge status={heat.status} /></td></tr>)}</tbody></table></div>
+            <div className="table-summary"><span>Total shift tonnage: <strong>520.6 t</strong></span><span>Average temperature deviation: <strong>±3.2°C</strong></span><span>Passed heats: <strong>9 ladles</strong></span></div>
           </section>
         </div>
       </main>

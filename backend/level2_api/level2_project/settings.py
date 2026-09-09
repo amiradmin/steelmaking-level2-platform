@@ -15,6 +15,7 @@ ALLOWED_HOSTS = [
 ]
 
 INSTALLED_APPS = [
+    "daphne",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -57,6 +58,12 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "level2_project.wsgi.application"
 ASGI_APPLICATION = "level2_project.asgi.application"
+TELEMETRY_PUSH_INTERVAL_SECONDS = float(
+    os.getenv("TELEMETRY_PUSH_INTERVAL_SECONDS", "1.0")
+)
+TELEMETRY_STALE_AFTER_SECONDS = float(
+    os.getenv("TELEMETRY_STALE_AFTER_SECONDS", "5.0")
+)
 
 if os.getenv("DJANGO_TEST_SQLITE", "0").lower() in {"1", "true", "yes", "on"}:
     DATABASES = {

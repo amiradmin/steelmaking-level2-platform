@@ -23,7 +23,7 @@ services:
 
   level1-simulator:
     build:
-      context: ./services/level1_simulator
+      context: ./backend/level1_simulator
     container_name: steelmaking-level2-simulator
     restart: unless-stopped
     depends_on:
@@ -39,7 +39,7 @@ services:
 
   heat-management:
     build:
-      context: ./services/heat_management
+      context: ./backend/heat_management
     container_name: steelmaking-level2-heat-management
     restart: unless-stopped
     depends_on:
@@ -67,7 +67,7 @@ services:
 
   level2-api:
     build:
-      context: ./services/level2_api
+      context: ./backend/level2_api
     container_name: steelmaking-level2-api
     restart: unless-stopped
     depends_on:

@@ -56,11 +56,15 @@ For local development, the PLC/DCS side is currently represented by a Dockerized
 ## Repository structure
 
 ```text
-docs/                           Engineering and interface specifications
-infrastructure/database/        PostgreSQL/TimescaleDB schema, seed and tests
-services/level1_simulator/      Live EAF/LF/CCM process simulator
-services/heat_management/       FastAPI Heat Management service
-scripts/                         Local acceptance/smoke tests
+backend/                         Backend services
+  heat_management/              FastAPI Heat Management service
+  level1_simulator/             Live EAF/LF/CCM process simulator
+  level2_api/                   Django Level 2 API
+frontend/                        React/Vite operator interface
+infrastructure/                  Database and reverse-proxy configuration
+docs/                            Engineering and interface specifications
+scripts/                         Local acceptance and smoke tests
+legacy/frontend/                 Archived initial frontend scaffold
 ```
 
 ## Local startup

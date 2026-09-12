@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import math
+import os
 
 from common import run_plc_simulator
 
@@ -12,6 +13,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 ENDPOINT = "opc.tcp://0.0.0.0:4840/ccm/"
 NAMESPACE_URI = "urn:steelmaking:plc:ccm"
 CYCLE_SECONDS = 240.0
+FAULT_MODE = os.getenv("PLC_SIM_FAULT_MODE", "NONE").strip().upper()
 
 INITIAL_VALUES = {
     "CCM.CastingSpeed": 0.0,
@@ -96,15 +98,41 @@ def values(elapsed: float, scan_counter: int) -> dict[str, object]:
         casting_active = False
 
     mold_water_flow = 925.0 + 20.0 * math.sin(elapsed / 17.0)
+    emergency_stop_ok = True
+
+    if FAULT_MODE == "COOLING_WATER_LOW":
+        mold_water_flow = 760.0
+    elif FAULT_MODE == "MOLD_LEVEL_HIGH":
+        mold_level = 91.0
+    elif FAULT_MODE == "MOLD_LEVEL_LOW":
+        mold_level = 43.0
+    elif FAULT_MODE == "EMERGENCY_STOP":
+        emergency_stop_ok = False
+    elif FAULT_MODE == "TUNDISH_TEMP_HIGH":
+        tundish_temp = 1575.0
+
     water_delta = 7.2 + 0.8 * casting_speed + 0.3 * math.sin(elapsed / 15.0)
     secondary_flow = 520.0 + 65.0 * casting_speed + 15.0 * math.sin(elapsed / 20.0)
 
     cooling_ok = mold_water_flow > 840.0
     level_control_ok = 50.0 <= mold_level <= 85.0
-    emergency_stop_ok = True
     interlock_ok = cooling_ok and level_control_ok and emergency_stop_ok
     fault = not interlock_ok
-    alarm_code = 301 if not cooling_ok else 302 if not level_control_ok else 303 if not emergency_stop_ok else 0
+
+    if not cooling_ok:
+        alarm_code = 301
+    elif not level_control_ok:
+        alarm_code = 302
+    elif not emergency_stop_ok:
+        alarm_code = 303
+    elif tundish_temp > 1565.0:
+        alarm_code = 304
+    else:
+        alarm_code = 0
+
+    if not interlock_ok:
+        casting_speed = 0.0
+        casting_active = False
 
     return {
         "CCM.CastingSpeed": float(max(0.0, casting_speed)),
@@ -132,6 +160,7 @@ def values(elapsed: float, scan_counter: int) -> dict[str, object]:
 
 
 async def main() -> None:
+    logging.getLogger("plc-simulator").info("CCM fault mode: %s", FAULT_MODE)
     await run_plc_simulator(
         controller_name="CCM PLC",
         controller_prefix="CCM",

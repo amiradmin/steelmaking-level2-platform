@@ -72,6 +72,44 @@ services:
     networks:
       - level2-net
 
+  eaf-plc-simulator:
+    profiles:
+      - plc-multi-test
+    image: steelmaking-level2-platform-plc-simulators:latest
+    build:
+      context: ./backend/plc_simulators
+    container_name: steelmaking-level2-eaf-plc-simulator
+    restart: unless-stopped
+    command: ["python", "eaf_simulator.py"]
+    ports:
+      - "${EAF_PLC_SIM_PORT:-4842}:4840"
+    networks:
+      - level2-net
+
+  lf-plc-simulator:
+    profiles:
+      - plc-multi-test
+    image: steelmaking-level2-platform-plc-simulators:latest
+    container_name: steelmaking-level2-lf-plc-simulator
+    restart: unless-stopped
+    command: ["python", "lf_simulator.py"]
+    ports:
+      - "${LF_PLC_SIM_PORT:-4843}:4840"
+    networks:
+      - level2-net
+
+  ccm-plc-simulator:
+    profiles:
+      - plc-multi-test
+    image: steelmaking-level2-platform-plc-simulators:latest
+    container_name: steelmaking-level2-ccm-plc-simulator
+    restart: unless-stopped
+    command: ["python", "ccm_simulator.py"]
+    ports:
+      - "${CCM_PLC_SIM_PORT:-4844}:4840"
+    networks:
+      - level2-net
+
   plc-ingestor-test:
     profiles:
       - plc-test

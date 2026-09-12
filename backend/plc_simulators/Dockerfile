@@ -21,6 +21,7 @@ RUN if [ -n "$PIP_TRUSTED_HOST" ]; then \
         -r requirements.txt; \
     fi
 
-COPY common.py eaf_simulator.py lf_simulator.py ccm_simulator.py ./
+COPY common.py s7_memory.py s7_address_map.json \
+     eaf_simulator.py lf_simulator.py ccm_simulator.py ./
 
 CMD ["python", "eaf_simulator.py"]

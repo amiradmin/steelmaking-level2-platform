@@ -81,8 +81,15 @@ services:
     container_name: steelmaking-level2-eaf-plc-simulator
     restart: unless-stopped
     command: ["python", "eaf_simulator.py"]
+    environment:
+      PLC_SIM_SCAN_SECONDS: ${PLC_SIM_SCAN_SECONDS:-0.1}
+      PLC_SIM_CPU_MODE: ${EAF_PLC_SIM_CPU_MODE:-RUN}
+      PLC_SIM_FAULT_MODE: ${EAF_PLC_SIM_FAULT_MODE:-NONE}
+      PLC_SIM_S7_ENABLED: "1"
+      PLC_SIM_S7_PORT: "102"
     ports:
       - "${EAF_PLC_SIM_PORT:-4842}:4840"
+      - "${EAF_PLC_S7_PORT:-1102}:102"
     networks:
       - level2-net
 
@@ -93,8 +100,15 @@ services:
     container_name: steelmaking-level2-lf-plc-simulator
     restart: unless-stopped
     command: ["python", "lf_simulator.py"]
+    environment:
+      PLC_SIM_SCAN_SECONDS: ${PLC_SIM_SCAN_SECONDS:-0.1}
+      PLC_SIM_CPU_MODE: ${LF_PLC_SIM_CPU_MODE:-RUN}
+      PLC_SIM_FAULT_MODE: ${LF_PLC_SIM_FAULT_MODE:-NONE}
+      PLC_SIM_S7_ENABLED: "1"
+      PLC_SIM_S7_PORT: "102"
     ports:
       - "${LF_PLC_SIM_PORT:-4843}:4840"
+      - "${LF_PLC_S7_PORT:-1103}:102"
     networks:
       - level2-net
 
@@ -105,8 +119,15 @@ services:
     container_name: steelmaking-level2-ccm-plc-simulator
     restart: unless-stopped
     command: ["python", "ccm_simulator.py"]
+    environment:
+      PLC_SIM_SCAN_SECONDS: ${PLC_SIM_SCAN_SECONDS:-0.1}
+      PLC_SIM_CPU_MODE: ${CCM_PLC_SIM_CPU_MODE:-RUN}
+      PLC_SIM_FAULT_MODE: ${CCM_PLC_SIM_FAULT_MODE:-NONE}
+      PLC_SIM_S7_ENABLED: "1"
+      PLC_SIM_S7_PORT: "102"
     ports:
       - "${CCM_PLC_SIM_PORT:-4844}:4840"
+      - "${CCM_PLC_S7_PORT:-1104}:102"
     networks:
       - level2-net
 

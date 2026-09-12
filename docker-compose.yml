@@ -37,6 +37,67 @@ services:
     networks:
       - level2-net
 
+  plc-ingestor:
+    profiles:
+      - plc
+    image: steelmaking-level2-platform-plc-ingestor:latest
+    build:
+      context: ./backend/plc_ingestor
+    container_name: steelmaking-level2-plc-ingestor
+    restart: unless-stopped
+    depends_on:
+      historian-db:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      DB_HOST: historian-db
+      DB_PORT: 5432
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - level2-net
+
+  opcua-simulator:
+    profiles:
+      - plc-test
+    image: steelmaking-level2-platform-plc-ingestor:latest
+    container_name: steelmaking-level2-opcua-simulator
+    restart: unless-stopped
+    command: ["python", "opcua_simulator.py"]
+    healthcheck:
+      disable: true
+    ports:
+      - "${OPCUA_TEST_PORT:-4841}:4840"
+    networks:
+      - level2-net
+
+  plc-ingestor-test:
+    profiles:
+      - plc-test
+    image: steelmaking-level2-platform-plc-ingestor:latest
+    container_name: steelmaking-level2-plc-ingestor-test
+    restart: unless-stopped
+    depends_on:
+      historian-db:
+        condition: service_healthy
+      opcua-simulator:
+        condition: service_started
+    env_file:
+      - .env
+    environment:
+      DB_HOST: historian-db
+      DB_PORT: 5432
+      PLC_OPCUA_ENDPOINT: opc.tcp://opcua-simulator:4840/steelmaking/
+      PLC_OPCUA_USERNAME: ""
+      PLC_OPCUA_PASSWORD: ""
+      PLC_POLL_INTERVAL_SECONDS: 1
+      PLC_RECONNECT_DELAY_SECONDS: 2
+      PLC_NODE_MAP_JSON: >-
+        {"EAF.PowerMW":"ns=2;s=EAF.PowerMW","EAF.CurrentKA":"ns=2;s=EAF.CurrentKA","EAF.OxygenFlow":"ns=2;s=EAF.OxygenFlow","EAF.SteelTemperature":"ns=2;s=EAF.SteelTemperature","LF.SteelTemperature":"ns=2;s=LF.SteelTemperature","LF.ArgonFlow":"ns=2;s=LF.ArgonFlow","CCM.CastingSpeed":"ns=2;s=CCM.CastingSpeed","CCM.TundishTemperature":"ns=2;s=CCM.TundishTemperature"}
+    networks:
+      - level2-net
+
   heat-management:
     build:
       context: ./backend/heat_management

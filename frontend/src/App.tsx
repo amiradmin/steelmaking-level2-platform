@@ -1,5 +1,6 @@
 import { FormEvent, ReactNode, useCallback, useEffect, useMemo, useState } from 'react'
 import { AuthenticationExpiredError, OperatorProfile, authorizedFetch, clearTokens, loadTokens, login } from './auth'
+import { TelemetryConnectionStatus, subscribeRealtimeTelemetry } from './telemetry'
 
 type Theme = 'dark' | 'light'
 type View = 'login' | 'dashboard'
@@ -24,17 +25,26 @@ type ApiMeta = {
 type Alarm = {
   alarm_code: string
   severity: string
+  state?: string
   message: string
+  equipment_code?: string | null
   active_at?: string | null
+}
+
+type LiveValue = {
+  tag_name: string
+  equipment_code?: string | null
+  area?: string | null
+  engineering_unit?: string | null
+  value_double?: number | null
+  value_text?: string | null
+  quality?: string | null
+  ts?: string | null
 }
 
 type HeatOverview = {
   active_alarms?: Alarm[]
-  live_values?: Array<{
-    tag_name: string
-    engineering_unit?: string | null
-    value_double?: number | null
-  }>
+  live_values?: LiveValue[]
 }
 
 type IconName =
@@ -81,7 +91,7 @@ const demoHeats: Heat[] = [
   { heat_no: 'H-4079', status: 'COMPLETED', grade_code: '1008-ASTM', planned_weight_t: 170, actual_weight_t: 168.8 },
 ]
 
-const navItems: Array<{ icon: IconName; label: string; badge?: string }> = [
+const navItems: Array<{ icon: IconName; label: string; badge?: string; enabled?: boolean }> = [
   { icon: 'dashboard', label: 'Overview' },
   { icon: 'heat', label: 'Heat Tracking', badge: 'H-4082' },
   { icon: 'bolt', label: 'Electric Arc Furnace (EAF)' },
@@ -89,16 +99,38 @@ const navItems: Array<{ icon: IconName; label: string; badge?: string }> = [
   { icon: 'cast', label: 'Continuous Casting (CCM)' },
   { icon: 'inventory', label: 'Raw Materials & Charging' },
   { icon: 'history', label: 'Data Historian' },
-  { icon: 'chart', label: 'Reports & Analytics' },
+  { icon: 'chart', label: 'Reports & Analytics', enabled: false },
   { icon: 'alarm', label: 'Alarm Management', badge: '3' },
-  { icon: 'link', label: 'L1 / L3 Communications' },
-  { icon: 'settings', label: 'System Settings' },
+  { icon: 'link', label: 'L1 / L3 Communications', enabled: false },
+  { icon: 'settings', label: 'System Settings', enabled: false },
 ]
 
 function getInitialTheme(): Theme {
   const stored = localStorage.getItem('level2-theme')
   if (stored === 'dark' || stored === 'light') return stored
   return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'
+}
+
+function formatMetric(value: number | null | undefined, fractionDigits = 1): string {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return '—'
+  return value.toLocaleString(undefined, {
+    minimumFractionDigits: fractionDigits,
+    maximumFractionDigits: fractionDigits,
+  })
+}
+
+function formatClock(value: string | null): string {
+  if (!value) return 'waiting for telemetry'
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return 'just now'
+  return parsed.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+}
+
+function alarmTone(severity: string): 'critical' | 'warning' | 'info' {
+  const normalized = severity.toUpperCase()
+  if (normalized === 'CRITICAL' || normalized === 'HIGH') return 'critical'
+  if (normalized === 'WARNING' || normalized === 'MEDIUM') return 'warning'
+  return 'info'
 }
 
 function ThemeToggle({ theme, onChange }: { theme: Theme; onChange: () => void }) {
@@ -235,6 +267,10 @@ function Dashboard({ theme, onThemeChange, onLogout, initialOperator }: { theme:
   const [loading, setLoading] = useState(true)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [operator, setOperator] = useState<OperatorProfile | null>(initialOperator)
+  const [telemetryStatus, setTelemetryStatus] = useState<TelemetryConnectionStatus>('connecting')
+  const [l1LinkOnline, setL1LinkOnline] = useState(false)
+  const [l1AgeSeconds, setL1AgeSeconds] = useState<number | null>(null)
+  const [lastTelemetryAt, setLastTelemetryAt] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -278,16 +314,61 @@ function Dashboard({ theme, onThemeChange, onLogout, initialOperator }: { theme:
     return () => { cancelled = true }
   }, [onLogout])
 
+  useEffect(() => subscribeRealtimeTelemetry({
+    onSnapshot: (snapshot) => {
+      setLastTelemetryAt(snapshot.server_time)
+      setL1LinkOnline(snapshot.l1_link.online)
+      setL1AgeSeconds(snapshot.l1_link.age_seconds)
+      setOverview({
+        active_alarms: snapshot.active_alarms,
+        live_values: snapshot.live_values,
+      })
+      if (snapshot.active_heat) {
+        setHeats((current) => [
+          snapshot.active_heat as Heat,
+          ...current.filter((heat) => heat.heat_no !== snapshot.active_heat?.heat_no),
+        ])
+      }
+      setError(null)
+      setLoading(false)
+    },
+    onStatus: setTelemetryStatus,
+    onAuthenticationExpired: onLogout,
+  }), [onLogout])
+
   const activeHeat = useMemo(() => heats.find((heat) => !['COMPLETED', 'ABORTED', 'CANCELLED'].includes(heat.status)) ?? heats[0], [heats])
   const alarms = overview?.active_alarms ?? []
+  const liveValues = overview?.live_values ?? []
+
+  const valueFor = (...tagNames: string[]): number | null => {
+    for (const tagName of tagNames) {
+      const value = liveValues.find((item) => item.tag_name === tagName)?.value_double
+      if (typeof value === 'number' && Number.isFinite(value)) return value
+    }
+    return null
+  }
+
+  const moltenTemperature = activeHeat?.status === 'LF'
+    ? valueFor('LF.SteelTemperature', 'EAF.SteelTemperature')
+    : activeHeat?.status === 'CASTING'
+      ? valueFor('CCM.TundishTemperature', 'LF.SteelTemperature')
+      : valueFor('EAF.SteelTemperature', 'LF.SteelTemperature', 'CCM.TundishTemperature')
+  const eafPower = valueFor('EAF.PowerMW')
+  const argonFlow = valueFor('LF.ArgonFlow')
+  const castingSpeed = valueFor('CCM.CastingSpeed')
+  const criticalAlarmCount = alarms.filter((alarm) => ['CRITICAL', 'HIGH'].includes(alarm.severity.toUpperCase())).length
+  const realtimeHealthy = telemetryStatus === 'live' && l1LinkOnline
 
   return (
     <div className="dashboard-shell">
       <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
         <div className="sidebar-brand"><Brand /></div>
-        <div className="link-health"><span className="status-dot online" /><span><strong>L1 / L2 LINK: ACTIVE</strong><small>2.1 ms · REALTIME</small></span></div>
+        <div className="link-health"><span className={`status-dot ${realtimeHealthy ? 'online' : 'warning'}`} /><span><strong>{realtimeHealthy ? 'L1 / L2 LINK: ACTIVE' : 'L1 / L2 LINK: DEGRADED'}</strong><small>{l1AgeSeconds === null ? 'NO RECENT SAMPLE' : `${formatMetric(l1AgeSeconds, 1)} s · REALTIME`}</small></span></div>
         <nav className="side-nav" aria-label="System navigation">
-          {navItems.map((item, index) => <button className={index === 0 ? 'active' : ''} type="button" key={item.label}><Icon name={item.icon} /><span>{item.label}</span>{item.badge && <em>{item.badge}</em>}</button>)}
+          {navItems.map((item, index) => {
+            const enabled = item.enabled !== false
+            return <button className={index === 0 ? 'active' : ''} type="button" key={item.label} disabled={!enabled} aria-disabled={!enabled} title={enabled ? undefined : 'Available after server delivery'}><Icon name={item.icon} /><span>{item.label}</span>{item.badge && <em>{item.badge}</em>}</button>
+          })}
         </nav>
         <div className="sidebar-footer"><button type="button"><Icon name="settings" /> Shift Technical Support</button><button type="button" onClick={onLogout}><Icon name="logout" /> Sign Out</button></div>
       </aside>
@@ -301,10 +382,10 @@ function Dashboard({ theme, onThemeChange, onLogout, initialOperator }: { theme:
             <span><strong>Steelmaking Shop No. 1</strong><small>Shift B · Morning</small></span>
           </div>
           <div className="topbar-actions">
-            <span className="live-chip"><span className="status-dot online" /> Live Telemetry <b>LIVE</b></span>
+            <span className="live-chip"><span className={`status-dot ${telemetryStatus === 'live' ? 'online' : 'warning'}`} /> Live Telemetry <b>{telemetryStatus === 'live' ? 'LIVE' : 'RETRY'}</b></span>
             <label className="search-box"><Icon name="search" /><input placeholder="Search heat, grade, or ladle..." /></label>
             <ThemeToggle theme={theme} onChange={onThemeChange} />
-            <button className="icon-button notification-button" type="button" aria-label="Notifications"><Icon name="bell" /><i>3</i></button>
+            <button className="icon-button notification-button" type="button" aria-label="Notifications"><Icon name="bell" /><i>{alarms.length}</i></button>
             <div className="operator"><span><strong>{operator?.username ?? operator?.display_name ?? 'Level 2 Operator'}</strong><small>Authenticated User</small></span><span className="operator-avatar"><Icon name="user" /></span></div>
           </div>
         </header>
@@ -312,54 +393,60 @@ function Dashboard({ theme, onThemeChange, onLogout, initialOperator }: { theme:
         <div className="dashboard-content">
           <div className="page-heading">
             <div><span className="section-kicker">LEVEL 2 OPERATIONS</span><h1>Steelmaking Operations Overview</h1><p>Integrated production monitoring from the electric arc furnace to continuous casting</p></div>
-            <div className="update-state"><span className={`status-dot ${error ? 'warning' : 'online'}`} /><span><strong>{error ? 'Demo Data Mode' : 'Synced with Level 1'}</strong><small>Last updated: just now</small></span></div>
+            <div className="update-state"><span className={`status-dot ${error || !realtimeHealthy ? 'warning' : 'online'}`} /><span><strong>{error ? 'Demo Data Mode' : realtimeHealthy ? 'Synced with Level 1' : 'Realtime Link Degraded'}</strong><small>Last updated: {formatClock(lastTelemetryAt)}</small></span></div>
           </div>
 
           {error && <div className="api-notice"><Icon name="alarm" /><span>{error}</span></div>}
 
           <section className="kpi-grid" aria-label="Key process indicators">
-            <article className="kpi-card accent-orange"><div className="kpi-icon"><Icon name="heat" /></div><span>Current Active Heat</span><strong>{loading ? '…' : `#${activeHeat?.heat_no ?? '—'}`}</strong><small>Grade: {activeHeat?.grade_code ?? '—'} <b>T+42 min</b></small></article>
-            <article className="kpi-card accent-cyan"><div className="kpi-icon"><Icon name="ladle" /></div><span>Active Metallurgy Station</span><strong>{activeHeat?.status ?? 'LF-1'}</strong><small>Precision Alloying <b>RUNNING</b></small></article>
+            <article className="kpi-card accent-primary"><div className="kpi-icon"><Icon name="heat" /></div><span>Current Active Heat</span><strong>{loading ? '…' : `#${activeHeat?.heat_no ?? '—'}`}</strong><small>Grade: {activeHeat?.grade_code ?? '—'} <b>{activeHeat?.status ?? 'WAITING'}</b></small></article>
+            <article className="kpi-card accent-cyan"><div className="kpi-icon"><Icon name="ladle" /></div><span>Active Metallurgy Station</span><strong>{activeHeat?.status ?? '—'}</strong><small>Realtime process state <b>{realtimeHealthy ? 'RUNNING' : 'STALE'}</b></small></article>
             <article className="kpi-card accent-amber"><div className="kpi-icon"><Icon name="clock" /></div><span>Tap-to-Tap Cycle Time</span><strong>54 <i>min</i></strong><small>Target: 52 min <b>+2 min</b></small></article>
-            <article className="kpi-card accent-cyan"><div className="kpi-icon"><Icon name="temperature" /></div><span>Molten Bath Temperature</span><strong>1,624 <i>°C</i></strong><small>Optimal range 1615–1630 <b>OPTIMAL</b></small></article>
+            <article className="kpi-card accent-cyan"><div className="kpi-icon"><Icon name="temperature" /></div><span>Molten Bath Temperature</span><strong>{formatMetric(moltenTemperature, 1)} <i>°C</i></strong><small>Historian quality: {liveValues.length ? 'GOOD' : 'NO DATA'} <b>{realtimeHealthy ? 'LIVE' : 'STALE'}</b></small></article>
             <article className="kpi-card accent-blue"><div className="kpi-icon"><Icon name="energy" /></div><span>Specific Energy Consumption</span><strong>398 <i>kWh/t</i></strong><small>Shift average <b>−3.4%</b></small></article>
-            <article className="kpi-card accent-red"><div className="kpi-icon"><Icon name="yield" /></div><span>Yield & Alarms</span><strong>96.8 <i>%</i></strong><small>{Math.max(alarms.length, 3)} active alarms <b>1 CRITICAL</b></small></article>
+            <article className="kpi-card accent-red"><div className="kpi-icon"><Icon name="yield" /></div><span>Yield & Alarms</span><strong>96.8 <i>%</i></strong><small>{alarms.length} active alarms <b>{criticalAlarmCount} CRITICAL</b></small></article>
           </section>
 
           <section className="panel process-panel">
-            <div className="panel-heading"><div><span className="section-kicker">HEAT TRACKING TIMELINE</span><h2>Continuous Melting and Billet Production Flow</h2></div><span className="sync-badge"><Icon name="check" /> Sequence Synced · +4 min</span></div>
+            <div className="panel-heading"><div><span className="section-kicker">HEAT TRACKING TIMELINE</span><h2>Continuous Melting and Billet Production Flow</h2></div><span className="sync-badge"><Icon name="check" /> Historian Stream · {telemetryStatus === 'live' ? 'Connected' : 'Reconnecting'}</span></div>
             <div className="process-flow">
-              <article className="process-card"><div className="process-card-top"><span className="stage-number">01</span><span className="equipment-icon"><Icon name="bolt" /></span><StatusBadge status="EAF" /></div><h3>Electric Arc Furnace</h3><code>EAF-1 · NEXT #H-4083</code><dl><div><dt>Current Stage</dt><dd>Second Scrap Basket Charging</dd></div><div><dt>Active Power</dt><dd>82.4 MW</dd></div></dl><div className="progress"><span style={{ width: '65%' }} /></div><small>Melting progress 65% · Tapping at 14:48</small></article>
+              <article className={`process-card ${activeHeat?.status === 'EAF' ? 'current' : ''}`}><div className="process-card-top"><span className="stage-number">01</span><span className="equipment-icon"><Icon name="bolt" /></span><StatusBadge status="EAF" /></div><h3>Electric Arc Furnace</h3><code>EAF-01 · {activeHeat?.status === 'EAF' ? `HEAT #${activeHeat.heat_no}` : 'STANDBY'}</code><dl><div><dt>Current Stage</dt><dd>{activeHeat?.status === 'EAF' ? 'Melting' : 'Waiting / Previous Stage'}</dd></div><div><dt>Active Power</dt><dd>{formatMetric(eafPower, 1)} MW</dd></div></dl><div className="progress"><span style={{ width: activeHeat?.status === 'EAF' ? '65%' : '20%' }} /></div><small>Value source: EAF.PowerMW historian tag</small></article>
               <span className="flow-arrow"><Icon name="arrow" /></span>
-              <article className="process-card current"><div className="process-card-top"><span className="stage-number">02</span><span className="equipment-icon"><Icon name="ladle" /></span><StatusBadge status="LF" /></div><h3>Ladle Furnace</h3><code>LF-1 · HEAT #H-4082</code><dl><div><dt>Steel Temperature</dt><dd>1624 °C</dd></div><div><dt>Argon Stirring</dt><dd>Active</dd></div></dl><div className="progress"><span style={{ width: '85%' }} /></div><small>Metallurgy 85% complete · CCM ready in 7 min</small></article>
+              <article className={`process-card ${activeHeat?.status === 'LF' ? 'current' : ''}`}><div className="process-card-top"><span className="stage-number">02</span><span className="equipment-icon"><Icon name="ladle" /></span><StatusBadge status="LF" /></div><h3>Ladle Furnace</h3><code>LF-01 · {activeHeat?.status === 'LF' ? `HEAT #${activeHeat.heat_no}` : 'STANDBY'}</code><dl><div><dt>Steel Temperature</dt><dd>{formatMetric(valueFor('LF.SteelTemperature'), 1)} °C</dd></div><div><dt>Argon Flow</dt><dd>{formatMetric(argonFlow, 1)} Nm³/h</dd></div></dl><div className="progress"><span style={{ width: activeHeat?.status === 'LF' ? '85%' : '20%' }} /></div><small>Realtime values from LF historian tags</small></article>
               <span className="flow-arrow"><Icon name="arrow" /></span>
-              <article className="process-card"><div className="process-card-top"><span className="stage-number">03</span><span className="equipment-icon"><Icon name="cast" /></span><StatusBadge status="CASTING" /></div><h3>Continuous Casting</h3><code>CCM-2 · CASTING #H-4081</code><dl><div><dt>Casting Speed</dt><dd>1.45 m/min</dd></div><div><dt>Tundish Weight</dt><dd>24.2 t</dd></div></dl><div className="progress"><span style={{ width: '52%' }} /></div><small>Ladle 3 of 6 · Four strands active</small></article>
+              <article className={`process-card ${activeHeat?.status === 'CASTING' ? 'current' : ''}`}><div className="process-card-top"><span className="stage-number">03</span><span className="equipment-icon"><Icon name="cast" /></span><StatusBadge status="CASTING" /></div><h3>Continuous Casting</h3><code>CCM-01 · {activeHeat?.status === 'CASTING' ? `HEAT #${activeHeat.heat_no}` : 'STANDBY'}</code><dl><div><dt>Casting Speed</dt><dd>{formatMetric(castingSpeed, 2)} m/min</dd></div><div><dt>Tundish Temperature</dt><dd>{formatMetric(valueFor('CCM.TundishTemperature'), 1)} °C</dd></div></dl><div className="progress"><span style={{ width: activeHeat?.status === 'CASTING' ? '52%' : '20%' }} /></div><small>Realtime values from CCM historian tags</small></article>
             </div>
           </section>
 
           <div className="dashboard-grid">
             <section className="panel trend-panel">
-              <div className="panel-heading"><div><span className="section-kicker">REALTIME TREND · 60 MIN</span><h2>Live Parameters for Heat {activeHeat?.heat_no ?? 'H-4082'}</h2></div><button className="outline-button" type="button">1 Hour Zoom</button></div>
+              <div className="panel-heading"><div><span className="section-kicker">REALTIME TREND · 60 MIN</span><h2>Live Parameters for Heat {activeHeat?.heat_no ?? '—'}</h2></div><button className="outline-button" type="button">1 Hour Zoom</button></div>
               <div className="chart-legend"><span className="temperature">Steel Temperature (°C)</span><span className="power">Electrical Power (MW)</span><span className="argon">Argon Flow (Nm³/h)</span></div>
               <MiniTrend />
-              <div className="chart-axis"><span>13:20</span><span>13:35</span><span>13:50</span><span>14:05</span><span>14:22 · NOW</span></div>
-              <div className="live-metrics"><div><small>Molten Bath Temperature</small><strong>1,624.8 °C</strong><em>+12°C / 10min</em></div><div><small>Argon Gas Pressure</small><strong>6.4 bar</strong><em>180 Nl/min</em></div><div><small>Carbon Equivalent</small><strong>0.182%</strong><em>O₂: 24 ppm</em></div><div><small>Ladle Refractory Life</small><strong>42 heats</strong><em>OPTIMAL</em></div></div>
+              <div className="chart-axis"><span>−60 min</span><span>−45 min</span><span>−30 min</span><span>−15 min</span><span>NOW</span></div>
+              <div className="live-metrics"><div><small>Molten Bath Temperature</small><strong>{formatMetric(moltenTemperature, 1)} °C</strong><em>{realtimeHealthy ? 'LIVE HISTORIAN' : 'STALE'}</em></div><div><small>Argon Gas Flow</small><strong>{formatMetric(argonFlow, 1)} Nm³/h</strong><em>LF.ArgonFlow</em></div><div><small>EAF Electrical Power</small><strong>{formatMetric(eafPower, 1)} MW</strong><em>EAF.PowerMW</em></div><div><small>CCM Casting Speed</small><strong>{formatMetric(castingSpeed, 2)} m/min</strong><em>CCM.CastingSpeed</em></div></div>
             </section>
 
             <section className="panel alarm-panel">
-              <div className="panel-heading"><div><span className="section-kicker">ACTIVE ALARMS</span><h2>Process Alarms</h2></div><span className="alarm-count">3 ACTIVE</span></div>
+              <div className="panel-heading"><div><span className="section-kicker">ACTIVE ALARMS</span><h2>Process Alarms</h2></div><span className="alarm-count">{alarms.length} ACTIVE</span></div>
               <div className="alarm-list">
-                <article className="alarm-item critical"><div className="alarm-title"><span><Icon name="alarm" /> CRITICAL · EAF-1</span><time>14:19:32</time></div><strong>Roof Cooling Panel Temperature High</strong><p>Cooling-water supply and return temperature difference exceeds 18°C.</p><button type="button">Acknowledge Alarm (ACK)</button></article>
-                <article className="alarm-item warning"><div className="alarm-title"><span><Icon name="alarm" /> WARNING · LF-1</span><time>14:05:11</time></div><strong>Slag Basicity Ratio Deviation</strong><p>CaO/SiO₂ ratio is 2.45; minimum allowed value is 2.8.</p><button type="button">Review Charging Recipe</button></article>
-                <article className="alarm-item info"><div className="alarm-title"><span><Icon name="check" /> EVENT · CCM</span><time>13:58:04</time></div><strong>New Sequence Ladle Positioned</strong><p>Ladle H-4081 was positioned successfully on the turret.</p></article>
+                {alarms.length > 0 ? alarms.slice(0, 4).map((alarm) => (
+                  <article className={`alarm-item ${alarmTone(alarm.severity)}`} key={`${alarm.alarm_code}-${alarm.active_at ?? ''}`}>
+                    <div className="alarm-title"><span><Icon name="alarm" /> {alarm.severity.toUpperCase()} · {alarm.equipment_code ?? 'L1'}</span><time>{formatClock(alarm.active_at ?? null)}</time></div>
+                    <strong>{alarm.message}</strong>
+                    <p>{alarm.state ?? 'ACTIVE'} · Source synchronized from the Level 2 alarm table.</p>
+                  </article>
+                )) : (
+                  <article className="alarm-item info"><div className="alarm-title"><span><Icon name="check" /> SYSTEM · LEVEL 2</span><time>{formatClock(lastTelemetryAt)}</time></div><strong>No active process alarms</strong><p>The current heat has no active unacknowledged or acknowledged alarms.</p></article>
+                )}
               </div>
             </section>
           </div>
 
           <section className="panel heats-panel">
             <div className="panel-heading"><div><span className="section-kicker">PRODUCTION RECORD</span><h2>Recent Heat Metallurgical Record</h2></div><button className="outline-button" type="button">View Archive</button></div>
-            <div className="table-wrap"><table><thead><tr><th>Heat Number</th><th>Steel Grade</th><th>Production Route</th><th>Actual Weight</th><th>Tap Temperature</th><th>Quality Status</th></tr></thead><tbody>{heats.slice(0, 6).map((heat) => <tr key={heat.heat_no}><td className="heat-no">#{heat.heat_no}</td><td>{heat.grade_code ?? '—'}</td><td><code>EAF1 › LF1 › CCM2</code></td><td>{heat.actual_weight_t ?? heat.planned_weight_t ?? '—'} t</td><td>{heat.status === 'COMPLETED' ? '1632' : '1624'} °C</td><td><StatusBadge status={heat.status} /></td></tr>)}</tbody></table></div>
-            <div className="table-summary"><span>Total shift tonnage: <strong>520.6 t</strong></span><span>Average temperature deviation: <strong>±3.2°C</strong></span><span>Passed heats: <strong>9 ladles</strong></span></div>
+            <div className="table-wrap"><table><thead><tr><th>Heat Number</th><th>Steel Grade</th><th>Production Route</th><th>Actual Weight</th><th>Tap Temperature</th><th>Quality Status</th></tr></thead><tbody>{heats.slice(0, 6).map((heat) => <tr key={heat.heat_no}><td className="heat-no">#{heat.heat_no}</td><td>{heat.grade_code ?? '—'}</td><td><code>EAF1 › LF1 › CCM1</code></td><td>{heat.actual_weight_t ?? heat.planned_weight_t ?? '—'} t</td><td>{heat.heat_no === activeHeat?.heat_no ? formatMetric(moltenTemperature, 1) : heat.status === 'COMPLETED' ? '1632.0' : '—'} °C</td><td><StatusBadge status={heat.status} /></td></tr>)}</tbody></table></div>
+            <div className="table-summary"><span>Realtime source: <strong>Timescale Historian</strong></span><span>L1 sample age: <strong>{l1AgeSeconds === null ? '—' : `${formatMetric(l1AgeSeconds, 1)} s`}</strong></span><span>WebSocket: <strong>{telemetryStatus.toUpperCase()}</strong></span></div>
           </section>
         </div>
       </main>

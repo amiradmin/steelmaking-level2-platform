@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import math
+import os
 
 from common import run_plc_simulator
 
@@ -12,6 +13,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 ENDPOINT = "opc.tcp://0.0.0.0:4840/eaf/"
 NAMESPACE_URI = "urn:steelmaking:plc:eaf"
 CYCLE_SECONDS = 240.0
+FAULT_MODE = os.getenv("PLC_SIM_FAULT_MODE", "NONE").strip().upper()
 
 INITIAL_VALUES = {
     "EAF.PowerMW": 0.0,
@@ -108,12 +110,37 @@ def values(elapsed: float, scan_counter: int) -> dict[str, object]:
 
     cooling_flow = 790.0 + 18.0 * math.sin(elapsed / 11.0)
     hydraulic_ok = True
-    cooling_ok = cooling_flow > 700.0
     transformer_ready = True
+
+    if FAULT_MODE == "COOLING_WATER_LOW":
+        cooling_flow = 620.0
+    elif FAULT_MODE == "HYDRAULIC_FAIL":
+        hydraulic_ok = False
+    elif FAULT_MODE == "TRANSFORMER_TRIP":
+        transformer_ready = False
+    elif FAULT_MODE == "ROOF_INTERLOCK":
+        roof_closed = False
+
+    cooling_ok = cooling_flow > 700.0
     door_closed = stage_name != "TAPPING"
     interlock_ok = hydraulic_ok and cooling_ok and transformer_ready and (roof_closed or not arc_on)
     fault = not interlock_ok
-    alarm_code = 101 if not cooling_ok else 102 if not hydraulic_ok else 103 if not transformer_ready else 0
+
+    if not cooling_ok:
+        alarm_code = 101
+    elif not hydraulic_ok:
+        alarm_code = 102
+    elif not transformer_ready:
+        alarm_code = 103
+    elif arc_on and not roof_closed:
+        alarm_code = 104
+    else:
+        alarm_code = 0
+
+    if not interlock_ok:
+        arc_on = False
+        power = 0.0
+        current = 0.0
 
     return {
         "EAF.PowerMW": float(max(0.0, power)),
@@ -127,7 +154,7 @@ def values(elapsed: float, scan_counter: int) -> dict[str, object]:
         "EAF.StageName": stage_name,
         "EAF.HeatNumber": int(heat_number),
         "EAF.Ready": bool(interlock_ok and stage_name in {"IDLE", "CHARGE"}),
-        "EAF.Running": bool(stage_name not in {"IDLE"}),
+        "EAF.Running": bool(stage_name != "IDLE"),
         "EAF.Fault": bool(fault),
         "EAF.AlarmCode": int(alarm_code),
         "EAF.ArcOn": bool(arc_on),
@@ -143,6 +170,7 @@ def values(elapsed: float, scan_counter: int) -> dict[str, object]:
 
 
 async def main() -> None:
+    logging.getLogger("plc-simulator").info("EAF fault mode: %s", FAULT_MODE)
     await run_plc_simulator(
         controller_name="EAF PLC",
         controller_prefix="EAF",

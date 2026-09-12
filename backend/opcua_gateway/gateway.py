@@ -154,16 +154,18 @@ class HealthState:
         self.connected = {name: False for name in PLC_CONFIGS}
         self.last_success_at: str | None = None
         self.server_ready = False
+        self._lock = asyncio.Lock()
 
-    def persist(self) -> None:
-        payload = {
-            "server_ready": self.server_ready,
-            "connected": self.connected,
-            "last_success_at": self.last_success_at,
-        }
-        tmp = HEALTH_PATH.with_suffix(".tmp")
-        tmp.write_text(json.dumps(payload), encoding="utf-8")
-        tmp.replace(HEALTH_PATH)
+    async def persist(self) -> None:
+        async with self._lock:
+            payload = {
+                "server_ready": self.server_ready,
+                "connected": dict(self.connected),
+                "last_success_at": self.last_success_at,
+            }
+            tmp = HEALTH_PATH.with_suffix(".tmp")
+            tmp.write_text(json.dumps(payload), encoding="utf-8")
+            tmp.replace(HEALTH_PATH)
 
 
 async def poll_plc(
@@ -197,7 +199,7 @@ async def poll_plc(
             )
             health.connected[config.name] = True
             await connected_node.write_value(True)
-            health.persist()
+            await health.persist()
             LOGGER.info("Connected to %s S7 PLC", config.name)
 
             while True:
@@ -209,7 +211,7 @@ async def poll_plc(
                 health.connected[config.name] = True
                 health.last_success_at = datetime.now(timezone.utc).isoformat()
                 await connected_node.write_value(True)
-                health.persist()
+                await health.persist()
                 await asyncio.sleep(POLL_SECONDS)
 
         except asyncio.CancelledError:
@@ -227,7 +229,7 @@ async def poll_plc(
                     )
                 except Exception:
                     LOGGER.exception("Failed to mark %s as bad quality", tag_name)
-            health.persist()
+            await health.persist()
             await asyncio.sleep(RECONNECT_SECONDS)
         finally:
             try:
@@ -277,7 +279,7 @@ async def main() -> None:
 
     health = HealthState()
     health.server_ready = True
-    health.persist()
+    await health.persist()
 
     LOGGER.info("Central OPC UA server listening on %s", ENDPOINT)
     LOGGER.info("Namespace index: %s", namespace_index)

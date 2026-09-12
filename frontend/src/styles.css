@@ -139,6 +139,8 @@ button, select { cursor: pointer; }
 .side-nav button:hover, .sidebar-footer button:hover { background: var(--surface-2); color: var(--text); }
 .side-nav button.active { background: var(--primary-soft); color: var(--primary); font-weight: 700; box-shadow: inset 3px 0 var(--primary); }
 .side-nav button em { margin-left: auto; padding: 2px 6px; border-radius: 5px; color: var(--primary); background: var(--primary-soft); font: normal 600 8px 'JetBrains Mono', monospace; }
+.side-nav button:disabled { cursor: not-allowed; color: var(--muted); opacity: .34; filter: saturate(.25); }
+.side-nav button:disabled:hover { color: var(--muted); background: transparent; }
 .sidebar-footer { margin-top: auto; padding: 10px; border-top: 1px solid var(--border-soft); }
 .sidebar-footer button:last-child { color: var(--red); }
 .dashboard-main { flex: 1; min-width: 0; margin-left: 262px; }

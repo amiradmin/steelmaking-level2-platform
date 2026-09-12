@@ -91,7 +91,7 @@ const demoHeats: Heat[] = [
   { heat_no: 'H-4079', status: 'COMPLETED', grade_code: '1008-ASTM', planned_weight_t: 170, actual_weight_t: 168.8 },
 ]
 
-const navItems: Array<{ icon: IconName; label: string; badge?: string }> = [
+const navItems: Array<{ icon: IconName; label: string; badge?: string; enabled?: boolean }> = [
   { icon: 'dashboard', label: 'Overview' },
   { icon: 'heat', label: 'Heat Tracking', badge: 'H-4082' },
   { icon: 'bolt', label: 'Electric Arc Furnace (EAF)' },
@@ -99,10 +99,10 @@ const navItems: Array<{ icon: IconName; label: string; badge?: string }> = [
   { icon: 'cast', label: 'Continuous Casting (CCM)' },
   { icon: 'inventory', label: 'Raw Materials & Charging' },
   { icon: 'history', label: 'Data Historian' },
-  { icon: 'chart', label: 'Reports & Analytics' },
+  { icon: 'chart', label: 'Reports & Analytics', enabled: false },
   { icon: 'alarm', label: 'Alarm Management', badge: '3' },
-  { icon: 'link', label: 'L1 / L3 Communications' },
-  { icon: 'settings', label: 'System Settings' },
+  { icon: 'link', label: 'L1 / L3 Communications', enabled: false },
+  { icon: 'settings', label: 'System Settings', enabled: false },
 ]
 
 function getInitialTheme(): Theme {
@@ -365,7 +365,10 @@ function Dashboard({ theme, onThemeChange, onLogout, initialOperator }: { theme:
         <div className="sidebar-brand"><Brand /></div>
         <div className="link-health"><span className={`status-dot ${realtimeHealthy ? 'online' : 'warning'}`} /><span><strong>{realtimeHealthy ? 'L1 / L2 LINK: ACTIVE' : 'L1 / L2 LINK: DEGRADED'}</strong><small>{l1AgeSeconds === null ? 'NO RECENT SAMPLE' : `${formatMetric(l1AgeSeconds, 1)} s · REALTIME`}</small></span></div>
         <nav className="side-nav" aria-label="System navigation">
-          {navItems.map((item, index) => <button className={index === 0 ? 'active' : ''} type="button" key={item.label}><Icon name={item.icon} /><span>{item.label}</span>{item.badge && <em>{item.badge}</em>}</button>)}
+          {navItems.map((item, index) => {
+            const enabled = item.enabled !== false
+            return <button className={index === 0 ? 'active' : ''} type="button" key={item.label} disabled={!enabled} aria-disabled={!enabled} title={enabled ? undefined : 'Available after server delivery'}><Icon name={item.icon} /><span>{item.label}</span>{item.badge && <em>{item.badge}</em>}</button>
+          })}
         </nav>
         <div className="sidebar-footer"><button type="button"><Icon name="settings" /> Shift Technical Support</button><button type="button" onClick={onLogout}><Icon name="logout" /> Sign Out</button></div>
       </aside>
@@ -396,7 +399,7 @@ function Dashboard({ theme, onThemeChange, onLogout, initialOperator }: { theme:
           {error && <div className="api-notice"><Icon name="alarm" /><span>{error}</span></div>}
 
           <section className="kpi-grid" aria-label="Key process indicators">
-            <article className="kpi-card accent-orange"><div className="kpi-icon"><Icon name="heat" /></div><span>Current Active Heat</span><strong>{loading ? '…' : `#${activeHeat?.heat_no ?? '—'}`}</strong><small>Grade: {activeHeat?.grade_code ?? '—'} <b>{activeHeat?.status ?? 'WAITING'}</b></small></article>
+            <article className="kpi-card accent-primary"><div className="kpi-icon"><Icon name="heat" /></div><span>Current Active Heat</span><strong>{loading ? '…' : `#${activeHeat?.heat_no ?? '—'}`}</strong><small>Grade: {activeHeat?.grade_code ?? '—'} <b>{activeHeat?.status ?? 'WAITING'}</b></small></article>
             <article className="kpi-card accent-cyan"><div className="kpi-icon"><Icon name="ladle" /></div><span>Active Metallurgy Station</span><strong>{activeHeat?.status ?? '—'}</strong><small>Realtime process state <b>{realtimeHealthy ? 'RUNNING' : 'STALE'}</b></small></article>
             <article className="kpi-card accent-amber"><div className="kpi-icon"><Icon name="clock" /></div><span>Tap-to-Tap Cycle Time</span><strong>54 <i>min</i></strong><small>Target: 52 min <b>+2 min</b></small></article>
             <article className="kpi-card accent-cyan"><div className="kpi-icon"><Icon name="temperature" /></div><span>Molten Bath Temperature</span><strong>{formatMetric(moltenTemperature, 1)} <i>°C</i></strong><small>Historian quality: {liveValues.length ? 'GOOD' : 'NO DATA'} <b>{realtimeHealthy ? 'LIVE' : 'STALE'}</b></small></article>

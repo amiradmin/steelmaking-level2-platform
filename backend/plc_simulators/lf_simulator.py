@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import math
+import os
 
 from common import run_plc_simulator
 
@@ -12,6 +13,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 ENDPOINT = "opc.tcp://0.0.0.0:4840/lf/"
 NAMESPACE_URI = "urn:steelmaking:plc:lf"
 CYCLE_SECONDS = 180.0
+FAULT_MODE = os.getenv("PLC_SIM_FAULT_MODE", "NONE").strip().upper()
 
 INITIAL_VALUES = {
     "LF.SteelTemperature": 1565.0,
@@ -85,13 +87,42 @@ def values(elapsed: float, scan_counter: int) -> dict[str, object]:
 
     cooling_flow = 415.0 + 12.0 * math.sin(elapsed / 13.0)
     ladle_weight = 145.0 - 1.5 * max(0.0, min(1.0, cycle / CYCLE_SECONDS))
-    cooling_ok = cooling_flow > 360.0
     argon_pressure_ok = True
     transformer_ready = True
+
+    if FAULT_MODE == "COOLING_WATER_LOW":
+        cooling_flow = 320.0
+    elif FAULT_MODE == "ARGON_PRESSURE_LOW":
+        argon_pressure_ok = False
+        argon = min(argon, 10.0)
+    elif FAULT_MODE == "TRANSFORMER_TRIP":
+        transformer_ready = False
+    elif FAULT_MODE == "ROOF_INTERLOCK":
+        stage_name = stage_name
+
+    cooling_ok = cooling_flow > 360.0
     roof_closed = stage_name not in {"LADLE_RECEIVED", "COMPLETE"}
+    if FAULT_MODE == "ROOF_INTERLOCK":
+        roof_closed = False
+
     interlock_ok = cooling_ok and argon_pressure_ok and transformer_ready and (roof_closed or not arc_on)
     fault = not interlock_ok
-    alarm_code = 201 if not cooling_ok else 202 if not argon_pressure_ok else 203 if not transformer_ready else 0
+
+    if not cooling_ok:
+        alarm_code = 201
+    elif not argon_pressure_ok:
+        alarm_code = 202
+    elif not transformer_ready:
+        alarm_code = 203
+    elif arc_on and not roof_closed:
+        alarm_code = 204
+    else:
+        alarm_code = 0
+
+    if not interlock_ok:
+        arc_on = False
+        power = 0.0
+        current = 0.0
 
     return {
         "LF.SteelTemperature": float(temp),
@@ -105,7 +136,7 @@ def values(elapsed: float, scan_counter: int) -> dict[str, object]:
         "LF.StageName": stage_name,
         "LF.HeatNumber": int(heat_number),
         "LF.Ready": bool(interlock_ok and stage_name in {"LADLE_RECEIVED", "COMPLETE"}),
-        "LF.Running": bool(stage_name not in {"COMPLETE"}),
+        "LF.Running": bool(stage_name != "COMPLETE"),
         "LF.Fault": bool(fault),
         "LF.AlarmCode": int(alarm_code),
         "LF.ArcOn": bool(arc_on),
@@ -119,6 +150,7 @@ def values(elapsed: float, scan_counter: int) -> dict[str, object]:
 
 
 async def main() -> None:
+    logging.getLogger("plc-simulator").info("LF fault mode: %s", FAULT_MODE)
     await run_plc_simulator(
         controller_name="LF PLC",
         controller_prefix="LF",

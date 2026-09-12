@@ -116,6 +116,8 @@ services:
     profiles:
       - plc-multi-test
     image: steelmaking-level2-platform-plc-simulators:latest
+    build:
+      context: ./backend/plc_simulators
     container_name: steelmaking-level2-ccm-plc-simulator
     restart: unless-stopped
     command: ["python", "ccm_simulator.py"]
@@ -128,6 +130,69 @@ services:
     ports:
       - "${CCM_PLC_SIM_PORT:-4844}:4840"
       - "${CCM_PLC_S7_PORT:-1104}:102"
+    networks:
+      - level2-net
+
+  central-opcua-server:
+    profiles:
+      - plc-multi-test
+    image: steelmaking-level2-platform-central-opcua:latest
+    build:
+      context: ./backend
+      dockerfile: opcua_gateway/Dockerfile
+    container_name: steelmaking-level2-central-opcua
+    restart: unless-stopped
+    depends_on:
+      eaf-plc-simulator:
+        condition: service_started
+      lf-plc-simulator:
+        condition: service_started
+      ccm-plc-simulator:
+        condition: service_started
+    environment:
+      EAF_PLC_HOST: eaf-plc-simulator
+      EAF_PLC_PORT: "102"
+      EAF_PLC_RACK: "0"
+      EAF_PLC_SLOT: "2"
+      LF_PLC_HOST: lf-plc-simulator
+      LF_PLC_PORT: "102"
+      LF_PLC_RACK: "0"
+      LF_PLC_SLOT: "2"
+      CCM_PLC_HOST: ccm-plc-simulator
+      CCM_PLC_PORT: "102"
+      CCM_PLC_RACK: "0"
+      CCM_PLC_SLOT: "2"
+      OPCUA_GATEWAY_POLL_SECONDS: ${OPCUA_GATEWAY_POLL_SECONDS:-0.5}
+      OPCUA_GATEWAY_RECONNECT_SECONDS: ${OPCUA_GATEWAY_RECONNECT_SECONDS:-2}
+      OPCUA_GATEWAY_REQUIRE_ALL_PLC: "1"
+    ports:
+      - "${CENTRAL_OPCUA_PORT:-4845}:4840"
+    networks:
+      - level2-net
+
+  plc-ingestor-central-test:
+    profiles:
+      - plc-multi-test
+    image: steelmaking-level2-platform-plc-ingestor:latest
+    container_name: steelmaking-level2-plc-ingestor-central-test
+    restart: unless-stopped
+    depends_on:
+      historian-db:
+        condition: service_healthy
+      central-opcua-server:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      DB_HOST: historian-db
+      DB_PORT: 5432
+      PLC_OPCUA_ENDPOINT: opc.tcp://central-opcua-server:4840/steelmaking/
+      PLC_OPCUA_USERNAME: ""
+      PLC_OPCUA_PASSWORD: ""
+      PLC_POLL_INTERVAL_SECONDS: 1
+      PLC_RECONNECT_DELAY_SECONDS: 2
+      PLC_NODE_MAP_JSON: >-
+        {"EAF.PowerMW":"ns=2;s=EAF.PowerMW","EAF.CurrentKA":"ns=2;s=EAF.CurrentKA","EAF.OxygenFlow":"ns=2;s=EAF.OxygenFlow","EAF.SteelTemperature":"ns=2;s=EAF.SteelTemperature","LF.SteelTemperature":"ns=2;s=LF.SteelTemperature","LF.ArgonFlow":"ns=2;s=LF.ArgonFlow","CCM.CastingSpeed":"ns=2;s=CCM.CastingSpeed","CCM.TundishTemperature":"ns=2;s=CCM.TundishTemperature"}
     networks:
       - level2-net
 

@@ -40,6 +40,7 @@ services:
   plc-ingestor:
     profiles:
       - plc
+    image: steelmaking-level2-platform-plc-ingestor:latest
     build:
       context: ./backend/plc_ingestor
     container_name: steelmaking-level2-plc-ingestor
@@ -60,8 +61,7 @@ services:
   opcua-simulator:
     profiles:
       - plc-test
-    build:
-      context: ./backend/plc_ingestor
+    image: steelmaking-level2-platform-plc-ingestor:latest
     container_name: steelmaking-level2-opcua-simulator
     restart: unless-stopped
     command: ["python", "opcua_simulator.py"]
@@ -75,8 +75,7 @@ services:
   plc-ingestor-test:
     profiles:
       - plc-test
-    build:
-      context: ./backend/plc_ingestor
+    image: steelmaking-level2-platform-plc-ingestor:latest
     container_name: steelmaking-level2-plc-ingestor-test
     restart: unless-stopped
     depends_on:
@@ -90,6 +89,8 @@ services:
       DB_HOST: historian-db
       DB_PORT: 5432
       PLC_OPCUA_ENDPOINT: opc.tcp://opcua-simulator:4840/steelmaking/
+      PLC_OPCUA_USERNAME: ""
+      PLC_OPCUA_PASSWORD: ""
       PLC_POLL_INTERVAL_SECONDS: 1
       PLC_RECONNECT_DELAY_SECONDS: 2
       PLC_NODE_MAP_JSON: >-

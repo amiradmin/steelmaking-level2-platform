@@ -21,7 +21,7 @@ RUN if [ -n "$PIP_TRUSTED_HOST" ]; then \
         -r requirements.txt; \
     fi
 
-COPY ingestor.py healthcheck.py ./
+COPY ingestor.py healthcheck.py opcua_simulator.py ./
 
 HEALTHCHECK --interval=10s --timeout=3s --start-period=15s --retries=3 \
     CMD ["python", "healthcheck.py"]

@@ -24,7 +24,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       python3-typing-extensions \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt .
+COPY opcua_gateway/requirements.txt ./requirements.txt
 RUN --mount=type=cache,id=steelmaking-pip-cache,target=/root/.cache/pip,sharing=locked \
     if [ -n "$PIP_TRUSTED_HOST" ]; then \
       python -m pip install --retries 10 --timeout 120 \
@@ -37,11 +37,12 @@ RUN --mount=type=cache,id=steelmaking-pip-cache,target=/root/.cache/pip,sharing=
     fi && \
     python -m pip install --retries 10 --timeout 120 --no-deps \
       "https://files.pythonhosted.org/packages/3f/0d/2f8fc320a12b6c8b972568a588ae57f4db7e9f7e7f53d02a24d0cebb17d7/asyncua-1.1.8-py3-none-any.whl#sha256=40c57151b93537beb77cb3f1a0190d75cef5326e8c40978de28b69e5b41e6ede" && \
-    python -c "import asyncua, cryptography, OpenSSL; print('PLC ingestor dependency check OK')"
+    python -c "import asyncua, cryptography, OpenSSL; print('Central OPC UA dependency check OK')"
 
-COPY ingestor.py bootstrap_flow_tags.py healthcheck.py opcua_simulator.py ./
+COPY opcua_gateway/gateway.py opcua_gateway/healthcheck.py opcua_gateway/s7_probe.py ./
+COPY plc_simulators/s7_address_map.json ./s7_address_map.json
 
-HEALTHCHECK --interval=10s --timeout=3s --start-period=15s --retries=3 \
+HEALTHCHECK --interval=10s --timeout=4s --start-period=20s --retries=3 \
     CMD ["python", "healthcheck.py"]
 
-CMD ["sh", "-c", "python bootstrap_flow_tags.py && exec python ingestor.py"]
+CMD ["python", "gateway.py"]

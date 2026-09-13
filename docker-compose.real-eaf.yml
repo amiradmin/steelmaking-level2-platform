@@ -1,0 +1,36 @@
+services:
+  central-opcua-server:
+    environment:
+      EAF_PLC_HOST: ${EAF_PLC_HOST:?Set EAF_PLC_HOST to the real S7-400 IP address}
+      EAF_PLC_PORT: ${EAF_PLC_PORT:-102}
+      EAF_PLC_RACK: ${EAF_PLC_RACK:-0}
+      EAF_PLC_SLOT: ${EAF_PLC_SLOT:-2}
+      OPCUA_GATEWAY_MAP_PATH: /app/s7_address_map.active.json
+      OPCUA_GATEWAY_POLL_SECONDS: ${OPCUA_GATEWAY_POLL_SECONDS:-0.5}
+      OPCUA_GATEWAY_RECONNECT_SECONDS: ${OPCUA_GATEWAY_RECONNECT_SECONDS:-2}
+    volumes:
+      - ${S7_ADDRESS_MAP_FILE:-./backend/plc_simulators/s7_address_map.json}:/app/s7_address_map.active.json:ro
+
+  level2-api:
+    environment:
+      EAF_PLC_SOURCE: real
+      EAF_PLC_MODEL: ${EAF_PLC_MODEL:-Siemens S7-400}
+      EAF_PLC_HOST: ${EAF_PLC_HOST:?Set EAF_PLC_HOST to the real S7-400 IP address}
+      EAF_PLC_PORT: ${EAF_PLC_PORT:-102}
+      EAF_PLC_RACK: ${EAF_PLC_RACK:-0}
+      EAF_PLC_SLOT: ${EAF_PLC_SLOT:-2}
+
+# This override intentionally leaves the EAF simulator container available but
+# unused by the gateway. That keeps the normal plc-multi-test profile intact and
+# makes rollback to simulation immediate: simply omit this override file.
+#
+# S7_ADDRESS_MAP_FILE defaults to the simulator DB map. For the real plant PLC,
+# point it at a reviewed map that contains the actual S7-400 DB addresses and
+# types. The map is mounted read-only and does not require rebuilding the image.
+#
+# Production path with this override:
+#   real S7-400 EAF (ISO-on-TCP / S7, TCP/102)
+#        -> Central Gateway (python-snap7, read-only DB reads)
+#        -> normalized OPC UA namespace
+#        -> PLC ingestor
+#        -> historian / Level 2 API / dashboard

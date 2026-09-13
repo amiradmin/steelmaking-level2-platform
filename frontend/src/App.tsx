@@ -1,9 +1,12 @@
 import { FormEvent, ReactNode, useCallback, useEffect, useMemo, useState } from 'react'
 import { AuthenticationExpiredError, OperatorProfile, authorizedFetch, clearTokens, loadTokens, login } from './auth'
 import { TelemetryConnectionStatus, subscribeRealtimeTelemetry } from './telemetry'
+import { LiveSystemMap } from './SystemMap'
+import { LiveProductionFlow } from './ProductionFlow'
 
 type Theme = 'dark' | 'light'
 type View = 'login' | 'dashboard'
+type DashboardPage = 'overview' | 'production-flow' | 'system-map'
 
 type Heat = {
   heat_no: string
@@ -101,7 +104,8 @@ const navItems: Array<{ icon: IconName; label: string; badge?: string; enabled?:
   { icon: 'history', label: 'Data Historian' },
   { icon: 'chart', label: 'Reports & Analytics', enabled: false },
   { icon: 'alarm', label: 'Alarm Management', badge: '3' },
-  { icon: 'link', label: 'L1 / L3 Communications', enabled: false },
+  { icon: 'heat', label: 'Live Production Flow' },
+  { icon: 'link', label: 'Live System Map' },
   { icon: 'settings', label: 'System Settings', enabled: false },
 ]
 
@@ -271,6 +275,7 @@ function Dashboard({ theme, onThemeChange, onLogout, initialOperator }: { theme:
   const [l1LinkOnline, setL1LinkOnline] = useState(false)
   const [l1AgeSeconds, setL1AgeSeconds] = useState<number | null>(null)
   const [lastTelemetryAt, setLastTelemetryAt] = useState<string | null>(null)
+  const [dashboardPage, setDashboardPage] = useState<DashboardPage>('overview')
 
   useEffect(() => {
     let cancelled = false
@@ -358,6 +363,8 @@ function Dashboard({ theme, onThemeChange, onLogout, initialOperator }: { theme:
   const castingSpeed = valueFor('CCM.CastingSpeed')
   const criticalAlarmCount = alarms.filter((alarm) => ['CRITICAL', 'HIGH'].includes(alarm.severity.toUpperCase())).length
   const realtimeHealthy = telemetryStatus === 'live' && l1LinkOnline
+  const hasSystemMapAccess = operator?.username === 'amiradmin'
+  const visibleNavItems = navItems.filter((item) => item.label !== 'Live System Map' || hasSystemMapAccess)
 
   return (
     <div className="dashboard-shell">
@@ -365,9 +372,12 @@ function Dashboard({ theme, onThemeChange, onLogout, initialOperator }: { theme:
         <div className="sidebar-brand"><Brand /></div>
         <div className="link-health"><span className={`status-dot ${realtimeHealthy ? 'online' : 'warning'}`} /><span><strong>{realtimeHealthy ? 'L1 / L2 LINK: ACTIVE' : 'L1 / L2 LINK: DEGRADED'}</strong><small>{l1AgeSeconds === null ? 'NO RECENT SAMPLE' : `${formatMetric(l1AgeSeconds, 1)} s · REALTIME`}</small></span></div>
         <nav className="side-nav" aria-label="System navigation">
-          {navItems.map((item, index) => {
+          {visibleNavItems.map((item, index) => {
             const enabled = item.enabled !== false
-            return <button className={index === 0 ? 'active' : ''} type="button" key={item.label} disabled={!enabled} aria-disabled={!enabled} title={enabled ? undefined : 'Available after server delivery'}><Icon name={item.icon} /><span>{item.label}</span>{item.badge && <em>{item.badge}</em>}</button>
+            const isSystemMap = item.label === 'Live System Map'
+            const isProductionFlow = item.label === 'Live Production Flow'
+            const active = isSystemMap ? dashboardPage === 'system-map' : isProductionFlow ? dashboardPage === 'production-flow' : index === 0 && dashboardPage === 'overview'
+            return <button className={active ? 'active' : ''} type="button" key={item.label} disabled={!enabled} aria-disabled={!enabled} title={enabled ? undefined : 'Available after server delivery'} onClick={() => { if (isSystemMap) setDashboardPage('system-map'); else if (isProductionFlow) setDashboardPage('production-flow'); else if (index === 0) setDashboardPage('overview') }}><Icon name={item.icon} /><span>{item.label}</span>{item.badge && <em>{item.badge}</em>}</button>
           })}
         </nav>
         <div className="sidebar-footer"><button type="button"><Icon name="settings" /> Shift Technical Support</button><button type="button" onClick={onLogout}><Icon name="logout" /> Sign Out</button></div>
@@ -391,6 +401,7 @@ function Dashboard({ theme, onThemeChange, onLogout, initialOperator }: { theme:
         </header>
 
         <div className="dashboard-content">
+          {dashboardPage === 'production-flow' ? <LiveProductionFlow /> : dashboardPage === 'system-map' && hasSystemMapAccess ? <LiveSystemMap telemetryStatus={telemetryStatus} /> : <>
           <div className="page-heading">
             <div><span className="section-kicker">LEVEL 2 OPERATIONS</span><h1>Steelmaking Operations Overview</h1><p>Integrated production monitoring from the electric arc furnace to continuous casting</p></div>
             <div className="update-state"><span className={`status-dot ${error || !realtimeHealthy ? 'warning' : 'online'}`} /><span><strong>{error ? 'Demo Data Mode' : realtimeHealthy ? 'Synced with Level 1' : 'Realtime Link Degraded'}</strong><small>Last updated: {formatClock(lastTelemetryAt)}</small></span></div>
@@ -448,6 +459,7 @@ function Dashboard({ theme, onThemeChange, onLogout, initialOperator }: { theme:
             <div className="table-wrap"><table><thead><tr><th>Heat Number</th><th>Steel Grade</th><th>Production Route</th><th>Actual Weight</th><th>Tap Temperature</th><th>Quality Status</th></tr></thead><tbody>{heats.slice(0, 6).map((heat) => <tr key={heat.heat_no}><td className="heat-no">#{heat.heat_no}</td><td>{heat.grade_code ?? '—'}</td><td><code>EAF1 › LF1 › CCM1</code></td><td>{heat.actual_weight_t ?? heat.planned_weight_t ?? '—'} t</td><td>{heat.heat_no === activeHeat?.heat_no ? formatMetric(moltenTemperature, 1) : heat.status === 'COMPLETED' ? '1632.0' : '—'} °C</td><td><StatusBadge status={heat.status} /></td></tr>)}</tbody></table></div>
             <div className="table-summary"><span>Realtime source: <strong>Timescale Historian</strong></span><span>L1 sample age: <strong>{l1AgeSeconds === null ? '—' : `${formatMetric(l1AgeSeconds, 1)} s`}</strong></span><span>WebSocket: <strong>{telemetryStatus.toUpperCase()}</strong></span></div>
           </section>
+          </>}
         </div>
       </main>
     </div>

@@ -1,0 +1,62 @@
+flowchart TB
+
+    subgraph FIELD["1. Field Layer"]
+
+        subgraph PLC_REAL["Production PLCs"]
+            EAF_PLC["EAF PLC<br/>Siemens S7-400"]
+            LF_PLC["LF PLC<br/>Siemens S7-400"]
+            CCM_PLC["CCM PLC<br/>Siemens S7-400"]
+        end
+
+        subgraph PLC_SIM["PLC Simulators"]
+            EAF_SIM["EAF Simulator<br/>S7-400"]
+            LF_SIM["LF Simulator<br/>S7-400"]
+            CCM_SIM["CCM Simulator<br/>S7-400"]
+        end
+
+        OPC["Central OPC UA Server"]
+    end
+
+    subgraph INGESTION["2. Ingestion & Process Services"]
+
+        INGESTOR["PLC Ingestor<br/><br/>Read Tags<br/>Tag Mapping<br/>Timestamp<br/>Quality<br/>Reconnect<br/>Healthcheck"]
+
+        HEAT["Heat Management<br/><br/>Heat Lifecycle<br/>Stage Management<br/>EAF → LF → CCM<br/>Process Events"]
+    end
+
+    subgraph DATA["3. Data & API"]
+
+        HISTORIAN["Historian DB<br/><br/>TimescaleDB<br/>Process Samples<br/>Heat Events<br/>Alarms<br/>Historical Data"]
+
+        API["Level 2 API<br/><br/>Django<br/>JWT<br/>REST API<br/>WebSocket"]
+    end
+
+    subgraph UI["4. Gateway & Presentation"]
+
+        NGINX["Nginx<br/><br/>Reverse Proxy"]
+
+        FRONTEND["Frontend<br/><br/>React<br/>Operator Dashboard"]
+
+        OPERATOR["Operator"]
+    end
+
+    EAF_PLC --> OPC
+    LF_PLC --> OPC
+    CCM_PLC --> OPC
+
+    EAF_SIM -.-> OPC
+    LF_SIM -.-> OPC
+    CCM_SIM -.-> OPC
+
+    OPC --> INGESTOR
+
+    INGESTOR --> HISTORIAN
+    INGESTOR --> HEAT
+
+    HEAT --> HISTORIAN
+
+    HISTORIAN --> API
+
+    API --> NGINX
+    NGINX --> FRONTEND
+    FRONTEND --> OPERATOR

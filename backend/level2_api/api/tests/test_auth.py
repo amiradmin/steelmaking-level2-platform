@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from django.contrib.auth import get_user_model
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
+from unittest.mock import patch
 
 
 class JwtAuthenticationTests(APITestCase):
@@ -76,3 +78,73 @@ class JwtAuthenticationTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn("access", response.json())
+
+    def test_live_system_map_requires_jwt_and_returns_flow_health(self) -> None:
+        unauthenticated = self.client.get(reverse("live-system-map"))
+        self.assertEqual(unauthenticated.status_code, status.HTTP_401_UNAUTHORIZED)
+
+        restricted_token = self.obtain_tokens()["access"]
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {restricted_token}")
+        restricted_response = self.client.get(reverse("live-system-map"))
+        self.assertEqual(restricted_response.status_code, status.HTTP_403_FORBIDDEN)
+
+        administrator = get_user_model().objects.create_user(
+            username="amiradmin",
+            password="administrator-test-password",
+        )
+        administrator_token = self.client.post(
+            reverse("token-obtain-pair"),
+            {"username": administrator.username, "password": "administrator-test-password"},
+            format="json",
+        ).json()["access"]
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {administrator_token}")
+        now = datetime.now(timezone.utc)
+        controller_samples = {
+            "eaf": {"last_sample_at": now, "samples_last_window": 12},
+            "lf": {"last_sample_at": now, "samples_last_window": 11},
+            "ccm": {"last_sample_at": now, "samples_last_window": 10},
+        }
+
+        with (
+            patch("api.system_map._latest_controller_samples", return_value=controller_samples),
+            patch("api.system_map._latest_opcua_sample", return_value=now),
+            patch("api.system_map._service_health", return_value=True),
+        ):
+            response = self.client.get(reverse("live-system-map"))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        payload = response.json()
+        self.assertEqual(len(payload["nodes"]), 10)
+        self.assertEqual(len(payload["flows"]), 8)
+        self.assertEqual(payload["nodes"][0]["status"], "online")
+        self.assertEqual(payload["flows"][3]["label"], "OPC UA")
+
+    def test_live_production_flow_is_available_to_every_authenticated_user(self) -> None:
+        unauthenticated = self.client.get(reverse("production-flow"))
+        self.assertEqual(unauthenticated.status_code, status.HTTP_401_UNAUTHORIZED)
+
+        access_token = self.obtain_tokens()["access"]
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {access_token}")
+        snapshot = {
+            "active_heat": {
+                "id": "1d2a89d1-6d54-4eb6-9aa0-8c3af0c761ea",
+                "heat_no": "SIM-H-001",
+                "status": "LF",
+            },
+            "live_values": [
+                {"tag_name": "LF.SteelTemperature", "value_double": 1588.0, "engineering_unit": "degC", "quality": "GOOD", "ts": datetime.now(timezone.utc)},
+                {"tag_name": "LF.ArgonFlow", "value_double": 122.0, "engineering_unit": "Nm3/h", "quality": "GOOD", "ts": datetime.now(timezone.utc)},
+            ],
+            "l1_link": {"online": True, "age_seconds": 1.0, "last_sample_at": datetime.now(timezone.utc)},
+        }
+        with (
+            patch("api.production_flow.build_dashboard_snapshot", return_value=snapshot),
+            patch("api.production_flow._active_stage", return_value={"stage": "LF", "area": "LF", "started_at": datetime.now(timezone.utc), "equipment_code": "LF-01"}),
+        ):
+            response = self.client.get(reverse("production-flow"))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        payload = response.json()
+        self.assertEqual(payload["current_heat"]["heat_no"], "SIM-H-001")
+        self.assertEqual(payload["stations"][1]["state"], "active")
+        self.assertEqual(payload["stations"][2]["state"], "ready")

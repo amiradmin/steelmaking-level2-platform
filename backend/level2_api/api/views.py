@@ -115,6 +115,8 @@ def api_meta(request: Request) -> Response:
                 "alarm-query",
                 "historian-latest-values",
                 "historian-tag-samples",
+                "live-production-flow",
+                "live-system-map",
             ],
             "write_service": "heat-management",
         }

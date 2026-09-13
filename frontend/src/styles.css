@@ -294,3 +294,18 @@ td code { color: var(--muted); font: 500 8px 'JetBrains Mono', monospace; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; }
 }
+
+
+/* Control-room readability: operational data should be legible at a glance. */
+.side-nav button, .sidebar-footer button { font-size: 13px; }
+.link-health strong, .link-health small { font-size: 10px; }
+.dashboard-context strong, .operator strong { font-size: 12px; }
+.dashboard-context small, .operator small, .live-chip { font-size: 10px; }
+.page-heading h1 { font-size: 28px; }.page-heading p { font-size: 13px; }
+.update-state strong { font-size: 12px; }.update-state small { font-size: 10px; }
+.kpi-card > span { font-size: 11px; }.kpi-card > strong { font-size: 23px; }.kpi-card > small { font-size: 10px; }
+.panel-heading h2, .process-card h3 { font-size: 15px; }
+.process-card dt, .process-card > small, .chart-legend span, .live-metrics small { font-size: 10px; }
+.process-card dd, .live-metrics strong, .alarm-item > strong { font-size: 12px; }
+.alarm-title, .alarm-item p, .table-summary { font-size: 10px; }
+th, td { font-size: 11px; } th { font-size: 10px; }.heat-no { font-size: 11px; }

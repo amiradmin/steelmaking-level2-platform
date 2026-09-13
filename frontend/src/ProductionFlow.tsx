@@ -55,6 +55,7 @@ function metricLabel(tagName: string): string {
 }
 
 function Station({ station, index }: { station: FlowStation; index: number }) {
+  const activeActivityIndex = station.current_activity ? station.activities.indexOf(station.current_activity) : -1
   return (
     <article className={`production-station ${station.state}`}>
       <header>
@@ -65,7 +66,21 @@ function Station({ station, index }: { station: FlowStation; index: number }) {
       <h2>{station.label}</h2>
       <code>{station.equipment}</code>
       <div className="production-activities" aria-label={`${station.label} activities`}>
-        {station.activities.map((activity) => <span className={station.current_activity === activity ? 'current' : ''} key={activity}>{activity}</span>)}
+        {station.activities.map((activity, activityIndex) => (
+          <span
+            className={'production-activity ' + (
+              station.current_activity === activity
+                ? 'current'
+                : station.state === 'complete' || (station.state === 'active' && activeActivityIndex > activityIndex)
+                  ? 'complete'
+                  : 'upcoming'
+            )}
+            key={activity}
+          >
+            <i aria-hidden="true" />
+            <span>{activity}</span>
+          </span>
+        ))}
       </div>
       <p className="production-stage-label">{station.state === 'active' ? station.current_activity ?? 'Process active' : station.state === 'complete' ? 'Stage completed' : station.state === 'ready' ? 'Next production stage' : 'Waiting for upstream process'}</p>
       <small className="production-stage-time">{station.state === 'active' ? stageDuration(station.stage_age_seconds) : station.state === 'complete' ? 'Heat transferred downstream' : 'No active heat at this station'}</small>

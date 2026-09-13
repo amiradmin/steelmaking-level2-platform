@@ -278,6 +278,11 @@ def production_flow(request: Request) -> Response:
             progress = None
             state = _station_state(index=index, active_index=active_index)
 
+        activity_durations_seconds = {
+            str(stage_definition[0]): int(float(stage_definition[1]) * 60.0)
+            for stage_definition in definition["stages"].values()
+        }
+
         stations.append(
             {
                 "id": definition["id"],
@@ -286,6 +291,7 @@ def production_flow(request: Request) -> Response:
                 "equipment": definition["equipment"],
                 "short_label": definition["short_label"],
                 "activities": definition["activities"],
+                "activity_durations_seconds": activity_durations_seconds,
                 "state": state,
                 "current_activity": current_activity,
                 "stage_started_at": stage_started_at,

@@ -1,4 +1,4 @@
-.PHONY: full-heat full-heat-fast full-heat-60 full-heat-real full-heat-detached
+.PHONY: full-heat full-heat-fast full-heat-60 full-heat-real full-heat-detached eaf-real-probe eaf-real-up
 
 full-heat:
 	./scripts/full_heat_demo.sh --speed 120
@@ -14,3 +14,18 @@ full-heat-real:
 
 full-heat-detached:
 	./scripts/full_heat_demo.sh --speed 120 --detach
+
+# Build the gateway image and perform read-only S7 DB reads from the configured
+# real EAF PLC. Requires EAF_PLC_HOST in .env. No PLC write operation is used.
+eaf-real-probe:
+	docker compose --profile plc-multi-test build central-opcua-server
+	docker compose -f docker-compose.yml -f docker-compose.real-eaf.yml --profile plc-multi-test run --rm --no-deps central-opcua-server \
+		python s7_probe.py --controller EAF \
+		--host "$${EAF_PLC_HOST}" --port "$${EAF_PLC_PORT:-102}" \
+		--rack "$${EAF_PLC_RACK:-0}" --slot "$${EAF_PLC_SLOT:-2}"
+
+# Use the real S7-400 for EAF while LF and CCM continue using their simulators.
+# The EAF simulator may remain running but is not used as the gateway source.
+eaf-real-up:
+	docker compose -f docker-compose.yml -f docker-compose.real-eaf.yml --profile plc-multi-test up -d \
+		central-opcua-server plc-ingestor-central-test

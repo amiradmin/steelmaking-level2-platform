@@ -18,7 +18,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       python3-psycopg \
       python3-psycopg-c \
       python3-cryptography \
-    && python3 -c "import django, rest_framework, psycopg, corsheaders, channels, daphne; from rest_framework_simplejwt.authentication import JWTAuthentication; from drf_spectacular.openapi import AutoSchema; from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey; print('Level 2 Debian dependency check OK', django.get_version(), rest_framework.VERSION)" \
+    && python3 -c "import django, rest_framework, psycopg, corsheaders, channels, daphne, rest_framework_simplejwt, drf_spectacular; from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey; print('Level 2 Debian dependency check OK', django.get_version(), rest_framework.VERSION)" \
     && rm -rf /var/lib/apt/lists/*
 
 COPY . .

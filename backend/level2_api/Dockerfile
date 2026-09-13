@@ -25,4 +25,4 @@ COPY . .
 
 EXPOSE 8080
 
-CMD ["sh", "-c", "python3 manage.py migrate --noinput && python3 manage.py bootstrap_operator && daphne -b 0.0.0.0 -p 8080 level2_project.asgi:application"]
+CMD ["sh", "-c", "python3 manage.py migrate --noinput && python3 manage.py bootstrap_operator && exec python3 -m daphne -b 0.0.0.0 -p 8080 level2_project.asgi:application"]

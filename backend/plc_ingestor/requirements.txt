@@ -1,2 +1,2 @@
-asyncua>=1.1,<2
+asyncua==1.1.8
 psycopg[binary]>=3.2,<4

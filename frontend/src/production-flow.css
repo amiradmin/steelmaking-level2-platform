@@ -30,16 +30,21 @@
 .production-stage-time { grid-area: time; align-self: start; display: block; margin-top: 4px; min-height: 16px; color: var(--muted); font: 500 10px 'JetBrains Mono', monospace; }
 
 .production-activities { grid-area: activities; align-self: center; margin: 0; padding: 10px 14px; display: grid; gap: 5px; border: 1px solid var(--border-soft); border-radius: 10px; background: color-mix(in srgb, var(--surface) 76%, transparent); }
-.production-activity { min-height: 27px; position: relative; display: grid; grid-template-columns: 18px minmax(0, 1fr); align-items: center; column-gap: 9px; color: var(--muted); font-size: 11px; }
+.production-activity { min-height: 27px; position: relative; display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; align-items: center; column-gap: 9px; color: var(--muted); font-size: 11px; }
 .production-activity > i { width: 10px; height: 10px; position: relative; z-index: 1; justify-self: center; border: 2px solid var(--border); border-radius: 50%; background: var(--surface); }
 .production-activity:not(:last-child) > i::after { content: ''; width: 1px; height: 22px; position: absolute; left: 50%; top: 8px; transform: translateX(-50%); background: var(--border); }
+.production-activity-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.production-activity-time { min-width: 92px; justify-self: end; padding: 3px 7px; border: 1px solid var(--border-soft); border-radius: 6px; color: var(--muted); background: color-mix(in srgb, var(--surface-2) 72%, transparent); font: 600 10px 'JetBrains Mono', monospace; text-align: right; white-space: nowrap; }
 .production-activity.complete { color: var(--cyan); }
 .production-activity.complete > i { border-color: var(--cyan); background: var(--cyan); box-shadow: 0 0 8px color-mix(in srgb, var(--cyan) 60%, transparent); }
 .production-activity.complete:not(:last-child) > i::after { background: color-mix(in srgb, var(--cyan) 68%, var(--border)); }
+.production-activity.complete .production-activity-time { color: var(--cyan); border-color: color-mix(in srgb, var(--cyan) 28%, var(--border-soft)); background: color-mix(in srgb, var(--cyan) 7%, var(--surface)); }
 .production-activity.current { color: var(--amber); font-weight: 700; }
 .production-activity.current > i { border-color: var(--amber); background: var(--amber); box-shadow: 0 0 0 4px color-mix(in srgb, var(--amber) 14%, transparent), 0 0 13px var(--amber); animation: subprocess-pulse 1.45s ease-in-out infinite; }
 .production-activity.current:not(:last-child) > i::after { background: linear-gradient(to bottom, var(--amber) 0 38%, color-mix(in srgb, var(--amber) 22%, var(--border)) 38% 100%); animation: subprocess-stream 1.2s linear infinite; }
+.production-activity.current .production-activity-time { color: var(--amber); border-color: color-mix(in srgb, var(--amber) 38%, var(--border-soft)); background: color-mix(in srgb, var(--amber) 9%, var(--surface)); box-shadow: 0 0 10px color-mix(in srgb, var(--amber) 10%, transparent); }
 .production-activity.upcoming { color: var(--muted); }
+.production-activity.upcoming .production-activity-time { opacity: .72; }
 
 .production-metrics { grid-area: metrics; align-self: end; margin: 11px 0 0; display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
 .production-metrics > div { min-width: 0; padding: 10px 12px; border: 1px solid var(--border-soft); border-radius: 7px; background: var(--surface); }
@@ -79,6 +84,8 @@
   .production-equipment-mark { width: 54px; height: 54px; font-size: 13px; }
   .production-station h2 { font-size: 16px; }
   .production-activities { margin-top: 10px; }
+  .production-activity { grid-template-columns: 16px minmax(0, 1fr) auto; column-gap: 7px; }
+  .production-activity-time { min-width: 84px; padding: 3px 5px; font-size: 9px; }
   .production-metrics { grid-template-columns: 1fr; }
   .production-footer span:last-child { margin-left: 0; }
 }

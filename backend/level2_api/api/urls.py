@@ -3,6 +3,7 @@ from __future__ import annotations
 from django.urls import path
 
 from . import views
+from .plc_sources import plc_sources
 from .production_flow import production_flow
 from .system_map import live_system_map
 
@@ -10,6 +11,7 @@ urlpatterns = [
     path("auth/me", views.current_user, name="current-user"),
     path("meta", views.api_meta, name="api-meta"),
     path("production-flow", production_flow, name="production-flow"),
+    path("plc-sources", plc_sources, name="plc-sources"),
     path("system-map", live_system_map, name="live-system-map"),
     path("heats", views.list_heats, name="heat-list"),
     path("heats/<str:heat_no>", views.heat_detail, name="heat-detail"),

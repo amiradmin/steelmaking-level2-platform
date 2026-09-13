@@ -8,6 +8,7 @@ SPEED=120
 HEAT_NUMBER=260001
 FOLLOW=1
 BUILD_IMAGES=1
+START_DELAY_SECONDS=30
 
 usage() {
   cat <<'EOF'
@@ -69,17 +70,19 @@ if ! [[ "$HEAT_NUMBER" =~ ^[1-9][0-9]*$ ]]; then
   exit 2
 fi
 
-SIM_EPOCH="$(date +%s)"
 TOTAL_SIM_SECONDS=10200
 EXPECTED_WALL_SECONDS=$(( (TOTAL_SIM_SECONDS + SPEED - 1) / SPEED ))
 
 export PLC_SIM_TIME_SCALE="$SPEED"
-export PLC_SIM_EPOCH_UNIX="$SIM_EPOCH"
 export PLC_SIM_HEAT_BASE="$HEAT_NUMBER"
 export PLC_SIM_HEAT_PITCH_MINUTES=70
 
-# Avoid simultaneous PyPI dependency downloads from multiple Compose builds.
-# This is especially important on slow or intermittent Docker networking.
+# The first PLC startup is a warm-up phase. A far-future epoch keeps every PLC
+# at StageCode=0 while the gateway and ingestor establish their connections.
+WARMUP_EPOCH=$(( $(date +%s) + 3600 ))
+export PLC_SIM_EPOCH_UNIX="$WARMUP_EPOCH"
+
+# Avoid simultaneous dependency downloads from multiple Compose builds.
 export COMPOSE_PARALLEL_LIMIT="${COMPOSE_PARALLEL_LIMIT:-1}"
 
 COMPOSE=(
@@ -93,7 +96,7 @@ printf '\n=== Full Heat Demo ===\n'
 printf 'Heat:        %s\n' "$HEAT_NUMBER"
 printf 'Speed:       %sx\n' "$SPEED"
 printf 'Process:     170 simulated minutes\n'
-printf 'Wall time:   ~%s seconds\n' "$EXPECTED_WALL_SECONDS"
+printf 'Run time:    ~%s seconds after telemetry warm-up\n' "$EXPECTED_WALL_SECONDS"
 printf 'Start:       CHARGE\n'
 printf 'Finish:      END_CAST\n\n'
 
@@ -117,17 +120,47 @@ build_service() {
   return 1
 }
 
-if (( BUILD_IMAGES == 1 )); then
-  printf 'Building required images serially to keep PyPI access stable...\n\n'
+container_state() {
+  local container="$1"
+  docker inspect -f '{{.State.Status}}' "$container" 2>/dev/null || true
+}
 
-  # Build the gateway first. It shares a locked BuildKit pip cache with the
-  # simulator and ingestor images, so large Python dependencies are reused.
+container_health() {
+  local container="$1"
+  docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' \
+    "$container" 2>/dev/null || true
+}
+
+wait_for_plc_path() {
+  local deadline=$(( SECONDS + 90 ))
+  local central_health
+  local ingestor_state
+
+  printf 'Waiting for OPC UA gateway and historian ingestor to become ready...\n'
+  while (( SECONDS < deadline )); do
+    central_health="$(container_health steelmaking-level2-central-opcua)"
+    ingestor_state="$(container_state steelmaking-level2-plc-ingestor-central-test)"
+
+    if [[ "$central_health" == "healthy" && "$ingestor_state" == "running" ]]; then
+      # The ingestor polls once per second. Give it a few cycles to publish the
+      # idle StageCode=0 values into the historian before the real heat starts.
+      sleep 4
+      printf 'PLC telemetry path is ready.\n'
+      return 0
+    fi
+    sleep 1
+  done
+
+  printf 'ERROR: PLC telemetry path did not become ready within 90 seconds.\n' >&2
+  return 1
+}
+
+if (( BUILD_IMAGES == 1 )); then
+  printf 'Building required images serially to keep dependency access stable...\n\n'
+
   build_service central-opcua-server
   build_service eaf-plc-simulator
   build_service plc-ingestor-central-test
-
-  # Application services are also built one at a time. BuildKit will return
-  # almost immediately when their layers have not changed.
   build_service heat-management
   build_service level2-api
   build_service frontend
@@ -137,8 +170,7 @@ else
   printf 'Skipping Docker image build and reusing existing images.\n\n'
 fi
 
-# Keep persistent services and historian data intact. Only the PLC path is
-# force-recreated so every demo starts at a fresh synchronized epoch.
+# Keep persistent application services and historian data intact.
 "${COMPOSE[@]}" up -d --no-build \
   historian-db \
   heat-management \
@@ -146,12 +178,12 @@ fi
   frontend \
   nginx
 
-# Nginx resolves Docker service names when its config is loaded. If an upstream
-# container was recreated and received a new IP address, a long-running Nginx
-# process can keep the stale upstream address and return 502. Restart it after
-# application services are healthy so Docker DNS is resolved again.
+# Nginx resolves Docker service names when its config is loaded. Restart it
+# after application services are healthy so recreated upstream IPs are resolved.
 "${COMPOSE[@]}" restart nginx
 
+# Phase 1: recreate the complete PLC telemetry path with an epoch far in the
+# future. The simulator code keeps all three controllers IDLE during this phase.
 "${COMPOSE[@]}" up -d --no-build --force-recreate \
   eaf-plc-simulator \
   lf-plc-simulator \
@@ -159,12 +191,39 @@ fi
   central-opcua-server \
   plc-ingestor-central-test
 
-printf '\nFull heat started. Production Flow: http://localhost/\n'
+wait_for_plc_path
+
+# Phase 2: arm only the three PLC simulators with the real synchronized epoch.
+# The gateway and ingestor remain running, so early EAF/LF stages cannot be lost
+# during their comparatively slow startup.
+SIM_EPOCH=$(( $(date +%s) + START_DELAY_SECONDS ))
+export PLC_SIM_EPOCH_UNIX="$SIM_EPOCH"
+
+"${COMPOSE[@]}" up -d --no-build --force-recreate \
+  eaf-plc-simulator \
+  lf-plc-simulator \
+  ccm-plc-simulator
+
+remaining=$(( SIM_EPOCH - $(date +%s) ))
+if (( remaining < 5 )); then
+  printf 'ERROR: PLC simulator restart consumed the start safety window. Run the demo again.\n' >&2
+  exit 1
+fi
+
+printf '\nFull heat armed. Production Flow: http://localhost/\n'
 printf 'Historian volume was preserved.\n'
+printf 'CHARGE starts in approximately %s seconds.\n' "$remaining"
 
 if (( FOLLOW == 0 )); then
   exit 0
 fi
+
+while (( $(date +%s) < SIM_EPOCH )); do
+  remaining=$(( SIM_EPOCH - $(date +%s) ))
+  printf '\rHeat %s armed | CHARGE starts in %2ds' "$HEAT_NUMBER" "$remaining"
+  sleep 1
+done
+printf '\r%-70s\r' ' '
 
 stage_for_seconds() {
   local s="$1"

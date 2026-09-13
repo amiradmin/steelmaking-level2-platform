@@ -23,7 +23,8 @@ eaf-real-probe:
 		python s7_probe.py --controller EAF
 
 # Use the real S7-400 for EAF while LF and CCM continue using their simulators.
-# The EAF simulator may remain running but is not used as the gateway source.
+# Recreate Level 2 API as well so Production Flow reports REAL PLC immediately.
 eaf-real-up:
 	docker compose -f docker-compose.yml -f docker-compose.real-eaf.yml --profile plc-multi-test up -d \
-		central-opcua-server plc-ingestor-central-test
+		level2-api central-opcua-server plc-ingestor-central-test
+	docker compose restart nginx

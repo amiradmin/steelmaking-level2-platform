@@ -36,11 +36,79 @@ type ProductionFlowSnapshot = {
   stations: FlowStation[]
 }
 
+type ActivityInfo = {
+  description: string
+  focus: string
+}
+
 const stateCopy: Record<FlowStation['state'], string> = {
   active: 'IN PROGRESS',
   complete: 'COMPLETE',
   ready: 'READY',
   standby: 'STANDBY',
+}
+
+const activityInfo: Record<string, ActivityInfo> = {
+  'EAF:Charge': {
+    description: 'Metallic charge is loaded and furnace readiness is confirmed before electrical melting begins.',
+    focus: 'Confirm charge completion and verify roof, door, cooling and permissive interlocks before energizing.',
+  },
+  'EAF:Melting': {
+    description: 'Arc power, current and oxygen input melt the charge and establish the liquid steel bath.',
+    focus: 'Watch power/current stability, oxygen flow, cooling condition and furnace interlocks.',
+  },
+  'EAF:Refining': {
+    description: 'The molten bath is refined while temperature, slag practice and process stability are controlled.',
+    focus: 'Watch the steel-temperature trend, oxygen input and any loss of process or safety permissives.',
+  },
+  'EAF:Superheat': {
+    description: 'The bath is brought to the required tapping temperature before transfer to the ladle.',
+    focus: 'Watch temperature approach to target and avoid unnecessary thermal overshoot.',
+  },
+  'EAF:Tapping': {
+    description: 'Molten steel is transferred from the EAF into the ladle for secondary metallurgy.',
+    focus: 'Confirm safe tapping conditions and downstream ladle readiness before transfer.',
+  },
+  'LF:Ladle received': {
+    description: 'The incoming ladle is received, identified and prepared for secondary-metallurgy treatment.',
+    focus: 'Confirm the correct heat, ladle readiness and basic treatment permissives.',
+  },
+  'LF:Heating': {
+    description: 'Arc heating raises or maintains steel temperature for the downstream casting requirement.',
+    focus: 'Watch steel temperature, electrical load, argon flow and cooling/interlock status.',
+  },
+  'LF:Alloying': {
+    description: 'Alloy additions trim steel chemistry toward the target grade specification.',
+    focus: 'Verify addition sequence and ensure mixing conditions are suitable for chemistry correction.',
+  },
+  'LF:Argon stirring': {
+    description: 'Argon stirring promotes bath homogenization of temperature and chemistry.',
+    focus: 'Watch argon flow and pressure, bath stability and treatment time.',
+  },
+  'LF:Sampling': {
+    description: 'A process sample is taken to verify steel chemistry and treatment readiness.',
+    focus: 'Confirm sample quality and review chemistry/temperature results before release.',
+  },
+  'LF:Ready to cast': {
+    description: 'LF treatment is complete and the ladle is released toward the continuous caster.',
+    focus: 'Confirm target temperature/chemistry and CCM readiness before transfer.',
+  },
+  'CCM:Prepare': {
+    description: 'Tundish, mold, cooling and casting systems are prepared for the incoming heat.',
+    focus: 'Confirm cooling-water, mold-level control, emergency-stop and casting permissives.',
+  },
+  'CCM:Start cast': {
+    description: 'Casting begins and speed, mold level and strand conditions are stabilized.',
+    focus: 'Watch mold level, casting-speed ramp, tundish temperature and cooling response.',
+  },
+  'CCM:Steady cast': {
+    description: 'Continuous casting runs at stable production conditions while the strand is formed.',
+    focus: 'Watch casting speed, mold level, tundish temperature and primary/secondary cooling stability.',
+  },
+  'CCM:End cast': {
+    description: 'Casting speed is reduced and the heat is completed in a controlled end-of-cast sequence.',
+    focus: 'Watch final mold/tundish conditions and confirm the casting sequence ends safely.',
+  },
 }
 
 function durationValue(seconds: number | null | undefined): string {
@@ -200,11 +268,39 @@ function Station({
               || (station.state === 'active' && activeActivityIndex > activityIndex)
               ? 'complete'
               : 'upcoming'
+          const planned = station.activity_durations_seconds?.[activity]
+          const completed = activityState === 'complete'
+          const current = activityState === 'current'
+          const elapsed = typeof planned !== 'number'
+            ? null
+            : completed
+              ? planned
+              : current
+                ? Math.min(
+                    planned,
+                    liveStageElapsedSeconds(station, nowMs, generatedAt, timeScale) ?? 0,
+                  )
+                : 0
+          const progress = typeof planned === 'number' && planned > 0 && typeof elapsed === 'number'
+            ? Math.min(100, Math.max(0, elapsed / planned * 100))
+            : null
+          const statusLabel = current
+            ? 'IN PROGRESS'
+            : completed
+              ? 'COMPLETE'
+              : 'UPCOMING'
+          const info = activityInfo[`${station.area}:${activity}`] ?? {
+            description: `${activity} is part of the ${station.label} operating sequence.`,
+            focus: 'Monitor the live process values and equipment permissives for this stage.',
+          }
+          const tooltipId = `${station.id}-activity-${activityIndex}-tooltip`
 
           return (
             <span
               className={`production-activity ${activityState}`}
               key={activity}
+              tabIndex={0}
+              aria-describedby={tooltipId}
             >
               <i aria-hidden="true" />
               <span className="production-activity-name">{activity}</span>
@@ -219,6 +315,71 @@ function Station({
                   timeScale,
                 )}
               </time>
+
+              <div
+                className={`production-activity-tooltip ${activityState}`}
+                id={tooltipId}
+                role="tooltip"
+              >
+                <div className="production-tooltip-heading">
+                  <div>
+                    <small>{station.short_label} SUB PROCESS</small>
+                    <strong>{activity}</strong>
+                  </div>
+                  <span>{statusLabel}</span>
+                </div>
+
+                <p className="production-tooltip-description">{info.description}</p>
+
+                <div className="production-tooltip-facts">
+                  <div>
+                    <span>Equipment</span>
+                    <strong>{station.equipment}</strong>
+                  </div>
+                  <div>
+                    <span>Heat</span>
+                    <strong>{station.heat_number ?? '—'}</strong>
+                  </div>
+                  <div>
+                    <span>Elapsed</span>
+                    <strong>{typeof elapsed === 'number' ? compactDurationValue(elapsed) : '—'}</strong>
+                  </div>
+                  <div>
+                    <span>Planned</span>
+                    <strong>{typeof planned === 'number' ? compactDurationValue(planned) : '—'}</strong>
+                  </div>
+                  <div>
+                    <span>Progress</span>
+                    <strong>{progress === null ? '—' : `${progress.toFixed(0)}%`}</strong>
+                  </div>
+                  <div>
+                    <span>Simulation</span>
+                    <strong>x{timeScale}</strong>
+                  </div>
+                </div>
+
+                {station.metrics.length > 0 && (
+                  <div className="production-tooltip-live">
+                    <small>LIVE AREA VALUES</small>
+                    <div>
+                      {station.metrics.slice(0, 2).map((metric) => (
+                        <span key={metric.tag_name}>
+                          <em>{metricLabel(metric.tag_name)}</em>
+                          <strong>
+                            {metricValue(metric)} {metric.unit ?? ''}
+                          </strong>
+                          {metric.quality && <i>{metric.quality}</i>}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="production-tooltip-focus">
+                  <small>OPERATOR FOCUS</small>
+                  <p>{info.focus}</p>
+                </div>
+              </div>
             </span>
           )
         })}

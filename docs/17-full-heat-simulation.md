@@ -28,6 +28,9 @@ That is the normal command to use for day-to-day testing.
 - keeps the same Heat Number synchronized through the complete process
 - runs only one complete heat instead of continuously creating new heats
 - preserves the existing historian database and Docker volume
+- builds required Docker images one at a time to avoid parallel PyPI download failures
+- retries an individual Docker image build up to three times
+- uses a shared BuildKit pip cache for the PLC simulator, OPC UA gateway, and PLC ingestor images
 - prints the current area, process stage, Heat Number, and progress in the terminal
 - completes after the heat reaches `END_CAST`
 
@@ -83,7 +86,19 @@ make full-heat
 
 Default speed: approximately `120x`.
 
-A full 170-minute process therefore completes in about **85 seconds** of wall-clock time.
+A full 170-minute process therefore completes in about **85 seconds** of wall-clock time after the containers have started.
+
+### Fast restart after the images are already built
+
+After one successful build, use:
+
+```bash
+make full-heat-fast
+```
+
+This skips Docker image builds, reuses the existing images, resets the synchronized simulation epoch, recreates the PLC path, and starts a new Heat from `CHARGE`.
+
+Use `make full-heat` again after pulling code changes that affect Docker images or Python/frontend source code.
 
 ### Slower demo mode
 
@@ -127,6 +142,12 @@ Example with `60x` speed:
 ./scripts/full_heat_demo.sh --speed 60 --heat 260010
 ```
 
+To start a specific Heat using already-built Docker images:
+
+```bash
+./scripts/full_heat_demo.sh --speed 120 --heat 260010 --skip-build
+```
+
 ## Expected terminal output
 
 Typical output will look similar to:
@@ -151,7 +172,7 @@ MOVE | LF -> CCM
 CCM  | STEADY CAST
 ...
 
-CCM  | END_CAST
+CCM  | END CAST
 Heat 260001 | 100%
 
 PASS: Heat 260001 completed END CAST.
@@ -182,13 +203,45 @@ PLC_SIM_HEAT_PITCH_MINUTES
 
 For normal testing, do not set the epoch manually. `full_heat_demo.sh` resets it automatically so the new heat starts from `CHARGE` every time.
 
+`full_heat_demo.sh` also sets `COMPOSE_PARALLEL_LIMIT=1` by default so Docker Compose builds do not download Python dependencies concurrently.
+
 ## If something looks wrong
 
-First update the branch and rebuild by simply running:
+First update the branch and run the standard command:
 
 ```bash
 git pull origin feature/plc-simulators
 make full-heat
+```
+
+### PyPI / cryptography build errors
+
+If Docker reports an error similar to:
+
+```text
+Could not find a version that satisfies the requirement cryptography>42.0.0
+```
+
+while another PLC image succeeds, this normally indicates intermittent package-index access from Docker rather than an application-code error.
+
+The current full-heat runner mitigates this by:
+
+- pinning `asyncua`, `cryptography`, and `python-dateutil`
+- building Docker services serially
+- retrying each build up to three times
+- sharing a locked BuildKit pip cache across the PLC-related images
+
+Pull the latest branch and retry:
+
+```bash
+git pull origin feature/plc-simulators
+make full-heat
+```
+
+Once the images have built successfully, use this for subsequent Heat simulations:
+
+```bash
+make full-heat-fast
 ```
 
 Check the simulator containers with:
@@ -224,12 +277,18 @@ ORDER BY pt.tag_name, ps.ts DESC;
 "
 ```
 
-## Daily-use command
+## Daily-use commands
 
-For normal development and UI testing, remember just this:
+After pulling code changes or when Docker images need rebuilding:
 
 ```bash
 make full-heat
 ```
 
-It is the preferred one-command path for simulating one complete steel heat from **Charge to End Cast**.
+After the images have already been built successfully and you only want to simulate another complete Heat:
+
+```bash
+make full-heat-fast
+```
+
+These are the preferred paths for simulating one complete steel heat from **Charge to End Cast**.

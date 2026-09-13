@@ -85,21 +85,33 @@ def simulated_elapsed_seconds(now_unix: float | None = None) -> float:
     return max(0.0, now - SIMULATION_EPOCH_UNIX) * SIMULATION_SPEED
 
 
+def _idle_state() -> TimelineState:
+    return TimelineState(
+        heat_number=HEAT_BASE,
+        stage_code=0,
+        stage_name="IDLE",
+        stage_elapsed_seconds=0.0,
+        stage_duration_seconds=0.0,
+        stage_progress=0.0,
+        area_elapsed_seconds=0.0,
+        active=False,
+    )
+
+
 def timeline_state(area_schedule: AreaSchedule, *, now_unix: float | None = None) -> TimelineState:
-    simulated = simulated_elapsed_seconds(now_unix)
+    now = time.time() if now_unix is None else now_unix
+
+    # Keep every PLC explicitly idle until the synchronized epoch arrives.
+    # This allows the OPC UA gateway, ingestor, and historian to become healthy
+    # before CHARGE starts, so high-speed demos do not skip early stages.
+    if now < SIMULATION_EPOCH_UNIX:
+        return _idle_state()
+
+    simulated = simulated_elapsed_seconds(now)
     relative = simulated - area_schedule.offset_seconds
 
     if relative < 0:
-        return TimelineState(
-            heat_number=HEAT_BASE,
-            stage_code=0,
-            stage_name="IDLE",
-            stage_elapsed_seconds=0.0,
-            stage_duration_seconds=0.0,
-            stage_progress=0.0,
-            area_elapsed_seconds=0.0,
-            active=False,
-        )
+        return _idle_state()
 
     if SINGLE_HEAT_MODE:
         # A full-heat demo must never roll over to the next heat. Each PLC waits

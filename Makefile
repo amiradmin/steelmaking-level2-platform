@@ -20,9 +20,7 @@ full-heat-detached:
 eaf-real-probe:
 	docker compose --profile plc-multi-test build central-opcua-server
 	docker compose -f docker-compose.yml -f docker-compose.real-eaf.yml --profile plc-multi-test run --rm --no-deps central-opcua-server \
-		python s7_probe.py --controller EAF \
-		--host "$${EAF_PLC_HOST}" --port "$${EAF_PLC_PORT:-102}" \
-		--rack "$${EAF_PLC_RACK:-0}" --slot "$${EAF_PLC_SLOT:-2}"
+		python s7_probe.py --controller EAF
 
 # Use the real S7-400 for EAF while LF and CCM continue using their simulators.
 # The EAF simulator may remain running but is not used as the gateway source.

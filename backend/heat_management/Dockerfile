@@ -1,19 +1,21 @@
-FROM python:3.13-slim-trixie
+FROM debian:trixie-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1 \
-    PYTHONPATH=/usr/lib/python3/dist-packages
+    PYTHONUNBUFFERED=1
 
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
       ca-certificates \
+      python3 \
+      python3-fastapi \
+      python3-uvicorn \
+      python3-pydantic \
+      python3-psycopg \
+      python3-psycopg-c \
       python3-cryptography \
+    && python3 -c "import fastapi, pydantic, psycopg; from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey; print('Heat management Debian dependency check OK')" \
     && rm -rf /var/lib/apt/lists/*
-
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt && \
-    python -c "from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey; print('Heat management license crypto check OK')"
 
 COPY app ./app
 

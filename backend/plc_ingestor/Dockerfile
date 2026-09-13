@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1.7
 FROM python:3.13-slim
 
 WORKDIR /app
@@ -11,12 +12,13 @@ ARG PIP_INDEX_URL=https://pypi.org/simple
 ARG PIP_TRUSTED_HOST=
 
 COPY requirements.txt .
-RUN if [ -n "$PIP_TRUSTED_HOST" ]; then \
-      python -m pip install --no-cache-dir --retries 10 --timeout 120 \
+RUN --mount=type=cache,id=steelmaking-pip-cache,target=/root/.cache/pip,sharing=locked \
+    if [ -n "$PIP_TRUSTED_HOST" ]; then \
+      python -m pip install --retries 10 --timeout 120 \
         --index-url "$PIP_INDEX_URL" --trusted-host "$PIP_TRUSTED_HOST" \
         -r requirements.txt; \
     else \
-      python -m pip install --no-cache-dir --retries 10 --timeout 120 \
+      python -m pip install --retries 10 --timeout 120 \
         --index-url "$PIP_INDEX_URL" \
         -r requirements.txt; \
     fi

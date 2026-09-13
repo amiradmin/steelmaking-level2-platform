@@ -16,6 +16,7 @@ type FlowStation = {
   equipment: string
   short_label: string
   activities: string[]
+  activity_durations_seconds?: Record<string, number>
   state: 'active' | 'complete' | 'ready' | 'standby'
   current_activity?: string | null
   stage_started_at?: string | null
@@ -53,20 +54,98 @@ function durationValue(seconds: number | null | undefined): string {
   return `${secs}s`
 }
 
-function stageTiming(station: FlowStation): string {
+function compactDurationValue(seconds: number): string {
+  const rounded = Math.max(0, Math.round(seconds))
+  const hours = Math.floor(rounded / 3600)
+  const minutes = Math.floor((rounded % 3600) / 60)
+  const secs = rounded % 60
+  const mm = String(minutes).padStart(2, '0')
+  const ss = String(secs).padStart(2, '0')
+  if (hours > 0) return `${String(hours).padStart(2, '0')}:${mm}:${ss}`
+  return `${mm}:${ss}`
+}
+
+function plannedStageDuration(station: FlowStation): number | null {
+  if (typeof station.stage_duration_seconds === 'number') {
+    return station.stage_duration_seconds
+  }
+  if (!station.current_activity) return null
+  const planned = station.activity_durations_seconds?.[station.current_activity]
+  return typeof planned === 'number' ? planned : null
+}
+
+function liveStageElapsedSeconds(
+  station: FlowStation,
+  nowMs: number,
+  generatedAt: string,
+  timeScale: number,
+): number | null {
+  if (station.state !== 'active' || typeof station.stage_age_seconds !== 'number') {
+    return typeof station.stage_age_seconds === 'number' ? station.stage_age_seconds : null
+  }
+
+  let elapsed = station.stage_age_seconds
+  const generatedAtMs = Date.parse(generatedAt)
+  if (Number.isFinite(generatedAtMs) && nowMs > generatedAtMs) {
+    const wallSeconds = (nowMs - generatedAtMs) / 1000
+    elapsed += wallSeconds * Math.max(0.1, timeScale)
+  }
+
+  const planned = plannedStageDuration(station)
+  return planned === null ? elapsed : Math.min(planned, elapsed)
+}
+
+function stageTiming(
+  station: FlowStation,
+  nowMs: number,
+  generatedAt: string,
+  timeScale: number,
+): string {
   if (station.state !== 'active') {
     if (station.state === 'complete') return 'Heat transferred downstream'
     if (station.state === 'ready') return 'Ready for the next heat'
     return 'Waiting for upstream process'
   }
-  if (typeof station.stage_age_seconds !== 'number') return 'Stage timing is collecting'
-  const elapsed = durationValue(station.stage_age_seconds)
-  if (typeof station.stage_duration_seconds !== 'number') return `${elapsed} in stage`
-  const duration = durationValue(station.stage_duration_seconds)
-  const progress = typeof station.stage_progress_percent === 'number'
-    ? ` · ${station.stage_progress_percent.toFixed(0)}%`
+
+  const liveElapsed = liveStageElapsedSeconds(station, nowMs, generatedAt, timeScale)
+  if (liveElapsed === null) return 'Stage timing is collecting'
+
+  const elapsed = durationValue(liveElapsed)
+  const durationSeconds = plannedStageDuration(station)
+  if (durationSeconds === null) return `${elapsed} in stage`
+
+  const duration = durationValue(durationSeconds)
+  const progress = durationSeconds > 0
+    ? ` · ${Math.min(100, liveElapsed / durationSeconds * 100).toFixed(0)}%`
     : ''
   return `${elapsed} / ${duration}${progress}`
+}
+
+function activityTiming(
+  station: FlowStation,
+  activity: string,
+  activityIndex: number,
+  activeActivityIndex: number,
+  nowMs: number,
+  generatedAt: string,
+  timeScale: number,
+): string {
+  const planned = station.activity_durations_seconds?.[activity]
+  if (typeof planned !== 'number') return '—'
+
+  const completed = station.state === 'complete'
+    || (station.state === 'active' && activeActivityIndex > activityIndex)
+  const current = station.state === 'active' && activeActivityIndex === activityIndex
+
+  let elapsed = 0
+  if (completed) {
+    elapsed = planned
+  } else if (current) {
+    elapsed = liveStageElapsedSeconds(station, nowMs, generatedAt, timeScale) ?? 0
+    elapsed = Math.min(planned, elapsed)
+  }
+
+  return `${compactDurationValue(elapsed)} / ${compactDurationValue(planned)}`
 }
 
 function metricValue(metric: FlowMetric): string {
@@ -82,7 +161,19 @@ function metricLabel(tagName: string): string {
   return segments[segments.length - 1] ?? tagName
 }
 
-function Station({ station, index }: { station: FlowStation; index: number }) {
+function Station({
+  station,
+  index,
+  nowMs,
+  generatedAt,
+  timeScale,
+}: {
+  station: FlowStation
+  index: number
+  nowMs: number
+  generatedAt: string
+  timeScale: number
+}) {
   const activeActivityIndex = station.current_activity
     ? station.activities.indexOf(station.current_activity)
     : -1
@@ -102,22 +193,35 @@ function Station({ station, index }: { station: FlowStation; index: number }) {
       </code>
 
       <div className="production-activities" aria-label={`${station.label} activities`}>
-        {station.activities.map((activity, activityIndex) => (
-          <span
-            className={'production-activity ' + (
-              station.current_activity === activity
-                ? 'current'
-                : station.state === 'complete'
-                  || (station.state === 'active' && activeActivityIndex > activityIndex)
-                  ? 'complete'
-                  : 'upcoming'
-            )}
-            key={activity}
-          >
-            <i aria-hidden="true" />
-            <span>{activity}</span>
-          </span>
-        ))}
+        {station.activities.map((activity, activityIndex) => {
+          const activityState = station.current_activity === activity
+            ? 'current'
+            : station.state === 'complete'
+              || (station.state === 'active' && activeActivityIndex > activityIndex)
+              ? 'complete'
+              : 'upcoming'
+
+          return (
+            <span
+              className={`production-activity ${activityState}`}
+              key={activity}
+            >
+              <i aria-hidden="true" />
+              <span className="production-activity-name">{activity}</span>
+              <time className="production-activity-time">
+                {activityTiming(
+                  station,
+                  activity,
+                  activityIndex,
+                  activeActivityIndex,
+                  nowMs,
+                  generatedAt,
+                  timeScale,
+                )}
+              </time>
+            </span>
+          )
+        })}
       </div>
 
       <p className="production-stage-label">
@@ -129,7 +233,9 @@ function Station({ station, index }: { station: FlowStation; index: number }) {
               ? 'Ready for next heat'
               : 'Waiting for upstream process'}
       </p>
-      <small className="production-stage-time">{stageTiming(station)}</small>
+      <small className="production-stage-time">
+        {stageTiming(station, nowMs, generatedAt, timeScale)}
+      </small>
 
       <dl className="production-metrics">
         {station.metrics.length > 0
@@ -153,6 +259,12 @@ function Station({ station, index }: { station: FlowStation; index: number }) {
 export function LiveProductionFlow() {
   const [snapshot, setSnapshot] = useState<ProductionFlowSnapshot | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [nowMs, setNowMs] = useState(() => Date.now())
+
+  useEffect(() => {
+    const clock = window.setInterval(() => setNowMs(Date.now()), 1000)
+    return () => window.clearInterval(clock)
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -165,6 +277,7 @@ export function LiveProductionFlow() {
         const next = await response.json() as ProductionFlowSnapshot
         if (!cancelled) {
           setSnapshot(next)
+          setNowMs(Date.now())
           setError(null)
         }
       } catch (requestError) {
@@ -207,6 +320,7 @@ export function LiveProductionFlow() {
   }, [snapshot])
 
   const online = snapshot?.l1_link.online ?? false
+  const timeScale = snapshot?.simulation?.time_scale ?? 1
 
   return (
     <section className="live-production-flow" aria-live="polite">
@@ -244,7 +358,13 @@ export function LiveProductionFlow() {
           <div className="production-route">
             {snapshot.stations.map((station, index) => (
               <div className="production-route-item" key={station.id}>
-                <Station station={station} index={index} />
+                <Station
+                  station={station}
+                  index={index}
+                  nowMs={nowMs}
+                  generatedAt={snapshot.generated_at}
+                  timeScale={timeScale}
+                />
                 {index < snapshot.stations.length - 1 && (
                   <span
                     className={`production-arrow ${
@@ -266,7 +386,7 @@ export function LiveProductionFlow() {
             <span><i className="legend-dot ready" /> Ready / turnaround</span>
             <span><i className="legend-dot standby" /> Waiting</span>
             <span>
-              Stage times are process-time values; the PLC demo may run accelerated.
+              Stage timers show elapsed / planned process time; accelerated demo time is applied live.
             </span>
           </footer>
         </div>

@@ -83,6 +83,10 @@ services:
     command: ["python", "eaf_simulator.py"]
     environment:
       PLC_SIM_SCAN_SECONDS: ${PLC_SIM_SCAN_SECONDS:-0.1}
+      PLC_SIM_TIME_SCALE: ${PLC_SIM_TIME_SCALE:-60}
+      PLC_SIM_EPOCH_UNIX: ${PLC_SIM_EPOCH_UNIX:-1788220800}
+      PLC_SIM_HEAT_BASE: ${PLC_SIM_HEAT_BASE:-260001}
+      PLC_SIM_HEAT_PITCH_MINUTES: ${PLC_SIM_HEAT_PITCH_MINUTES:-70}
       PLC_SIM_CPU_MODE: ${EAF_PLC_SIM_CPU_MODE:-RUN}
       PLC_SIM_FAULT_MODE: ${EAF_PLC_SIM_FAULT_MODE:-NONE}
       PLC_SIM_S7_ENABLED: "1"
@@ -102,6 +106,10 @@ services:
     command: ["python", "lf_simulator.py"]
     environment:
       PLC_SIM_SCAN_SECONDS: ${PLC_SIM_SCAN_SECONDS:-0.1}
+      PLC_SIM_TIME_SCALE: ${PLC_SIM_TIME_SCALE:-60}
+      PLC_SIM_EPOCH_UNIX: ${PLC_SIM_EPOCH_UNIX:-1788220800}
+      PLC_SIM_HEAT_BASE: ${PLC_SIM_HEAT_BASE:-260001}
+      PLC_SIM_HEAT_PITCH_MINUTES: ${PLC_SIM_HEAT_PITCH_MINUTES:-70}
       PLC_SIM_CPU_MODE: ${LF_PLC_SIM_CPU_MODE:-RUN}
       PLC_SIM_FAULT_MODE: ${LF_PLC_SIM_FAULT_MODE:-NONE}
       PLC_SIM_S7_ENABLED: "1"
@@ -123,6 +131,10 @@ services:
     command: ["python", "ccm_simulator.py"]
     environment:
       PLC_SIM_SCAN_SECONDS: ${PLC_SIM_SCAN_SECONDS:-0.1}
+      PLC_SIM_TIME_SCALE: ${PLC_SIM_TIME_SCALE:-60}
+      PLC_SIM_EPOCH_UNIX: ${PLC_SIM_EPOCH_UNIX:-1788220800}
+      PLC_SIM_HEAT_BASE: ${PLC_SIM_HEAT_BASE:-260001}
+      PLC_SIM_HEAT_PITCH_MINUTES: ${PLC_SIM_HEAT_PITCH_MINUTES:-70}
       PLC_SIM_CPU_MODE: ${CCM_PLC_SIM_CPU_MODE:-RUN}
       PLC_SIM_FAULT_MODE: ${CCM_PLC_SIM_FAULT_MODE:-NONE}
       PLC_SIM_S7_ENABLED: "1"
@@ -174,6 +186,8 @@ services:
     profiles:
       - plc-multi-test
     image: steelmaking-level2-platform-plc-ingestor:latest
+    build:
+      context: ./backend/plc_ingestor
     container_name: steelmaking-level2-plc-ingestor-central-test
     restart: unless-stopped
     depends_on:
@@ -192,7 +206,7 @@ services:
       PLC_POLL_INTERVAL_SECONDS: 1
       PLC_RECONNECT_DELAY_SECONDS: 2
       PLC_NODE_MAP_JSON: >-
-        {"EAF.PowerMW":"ns=2;s=EAF.PowerMW","EAF.CurrentKA":"ns=2;s=EAF.CurrentKA","EAF.OxygenFlow":"ns=2;s=EAF.OxygenFlow","EAF.SteelTemperature":"ns=2;s=EAF.SteelTemperature","LF.SteelTemperature":"ns=2;s=LF.SteelTemperature","LF.ArgonFlow":"ns=2;s=LF.ArgonFlow","CCM.CastingSpeed":"ns=2;s=CCM.CastingSpeed","CCM.TundishTemperature":"ns=2;s=CCM.TundishTemperature"}
+        {"EAF.PowerMW":"ns=2;s=EAF.PowerMW","EAF.CurrentKA":"ns=2;s=EAF.CurrentKA","EAF.OxygenFlow":"ns=2;s=EAF.OxygenFlow","EAF.SteelTemperature":"ns=2;s=EAF.SteelTemperature","EAF.StageCode":"ns=2;s=EAF.StageCode","EAF.HeatNumber":"ns=2;s=EAF.HeatNumber","LF.SteelTemperature":"ns=2;s=LF.SteelTemperature","LF.ArgonFlow":"ns=2;s=LF.ArgonFlow","LF.StageCode":"ns=2;s=LF.StageCode","LF.HeatNumber":"ns=2;s=LF.HeatNumber","CCM.CastingSpeed":"ns=2;s=CCM.CastingSpeed","CCM.TundishTemperature":"ns=2;s=CCM.TundishTemperature","CCM.StageCode":"ns=2;s=CCM.StageCode","CCM.HeatNumber":"ns=2;s=CCM.HeatNumber"}
     networks:
       - level2-net
 
@@ -263,6 +277,8 @@ services:
     environment:
       DB_HOST: historian-db
       DB_PORT: 5432
+      PLC_SIM_TIME_SCALE: ${PLC_SIM_TIME_SCALE:-60}
+      PLC_SIM_HEAT_PITCH_MINUTES: ${PLC_SIM_HEAT_PITCH_MINUTES:-70}
       DJANGO_BOOTSTRAP_USERNAME: ${DJANGO_BOOTSTRAP_USERNAME:-OP-4109}
       DJANGO_BOOTSTRAP_PASSWORD: ${DJANGO_BOOTSTRAP_PASSWORD:-Level2Demo-1405}
       DJANGO_BOOTSTRAP_DISPLAY_NAME: ${DJANGO_BOOTSTRAP_DISPLAY_NAME:-Shift Operator}

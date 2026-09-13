@@ -6,14 +6,25 @@ import math
 import os
 
 from common import run_plc_simulator
+from production_timeline import schedule, stage, timeline_state
 
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
 ENDPOINT = "opc.tcp://0.0.0.0:4840/ccm/"
 NAMESPACE_URI = "urn:steelmaking:plc:ccm"
-CYCLE_SECONDS = 240.0
 FAULT_MODE = os.getenv("PLC_SIM_FAULT_MODE", "NONE").strip().upper()
+
+SCHEDULE = schedule(
+    "CCM",
+    115.0,
+    (
+        stage("CCM", 1, "PREPARE", 5.0),
+        stage("CCM", 2, "START_CAST", 4.0),
+        stage("CCM", 3, "STEADY_CAST", 42.0),
+        stage("CCM", 4, "END_CAST", 4.0),
+    ),
+)
 
 INITIAL_VALUES = {
     "CCM.CastingSpeed": 0.0,
@@ -27,7 +38,7 @@ INITIAL_VALUES = {
     "CCM.StopperPositionPercent": 0.0,
     "CCM.StageCode": 0,
     "CCM.StageName": "IDLE",
-    "CCM.HeatNumber": 1000,
+    "CCM.HeatNumber": 260001,
     "CCM.Ready": True,
     "CCM.Running": False,
     "CCM.Fault": False,
@@ -45,11 +56,12 @@ def lerp(start: float, end: float, ratio: float) -> float:
 
 
 def values(elapsed: float, scan_counter: int) -> dict[str, object]:
-    cycle = elapsed % CYCLE_SECONDS
-    heat_number = 1000 + int(elapsed // CYCLE_SECONDS)
+    del scan_counter
+    state = timeline_state(SCHEDULE)
+    stage_name = state.stage_name
+    p = state.stage_progress
 
-    if cycle < 20.0:
-        stage_code, stage_name = 1, "PREPARE"
+    if stage_name == "PREPARE":
         casting_speed = 0.0
         mold_level = 68.0
         tundish_temp = 1548.0
@@ -57,9 +69,7 @@ def values(elapsed: float, scan_counter: int) -> dict[str, object]:
         oscillation = 0.0
         stopper = 0.0
         casting_active = False
-    elif cycle < 50.0:
-        p = (cycle - 20.0) / 30.0
-        stage_code, stage_name = 2, "START_CAST"
+    elif stage_name == "START_CAST":
         casting_speed = lerp(0.4, 2.2, p)
         mold_level = 70.0 + 3.0 * math.sin(elapsed / 2.8) * (1.0 - 0.6 * p)
         tundish_temp = lerp(1548.0, 1544.0, p)
@@ -67,9 +77,7 @@ def values(elapsed: float, scan_counter: int) -> dict[str, object]:
         oscillation = 120.0 + 20.0 * p
         stopper = 36.0 + 8.0 * math.sin(elapsed / 4.0)
         casting_active = True
-    elif cycle < 210.0:
-        p = (cycle - 50.0) / 160.0
-        stage_code, stage_name = 3, "STEADY_CAST"
+    elif stage_name == "STEADY_CAST":
         casting_speed = 2.45 + 0.12 * math.sin(elapsed / 14.0)
         mold_level = 70.0 + 1.2 * math.sin(elapsed / 5.0) + 0.4 * math.sin(elapsed / 1.7)
         tundish_temp = lerp(1544.0, 1536.0, p) + 0.8 * math.sin(elapsed / 18.0)
@@ -77,9 +85,7 @@ def values(elapsed: float, scan_counter: int) -> dict[str, object]:
         oscillation = 145.0 + 4.0 * math.sin(elapsed / 12.0)
         stopper = 42.0 + 5.0 * math.sin(elapsed / 8.0) - 0.35 * (mold_level - 70.0)
         casting_active = True
-    elif cycle < 235.0:
-        p = (cycle - 210.0) / 25.0
-        stage_code, stage_name = 4, "END_CAST"
+    elif stage_name == "END_CAST":
         casting_speed = lerp(2.2, 0.3, p)
         mold_level = lerp(70.0, 55.0, p)
         tundish_temp = lerp(1536.0, 1532.0, p)
@@ -88,7 +94,6 @@ def values(elapsed: float, scan_counter: int) -> dict[str, object]:
         stopper = lerp(38.0, 8.0, p)
         casting_active = True
     else:
-        stage_code, stage_name = 0, "IDLE"
         casting_speed = 0.0
         mold_level = 55.0
         tundish_temp = 1532.0
@@ -144,10 +149,10 @@ def values(elapsed: float, scan_counter: int) -> dict[str, object]:
         "CCM.SecondaryCoolingFlowM3h": float(secondary_flow),
         "CCM.OscillationFrequencyCpm": float(max(0.0, oscillation)),
         "CCM.StopperPositionPercent": float(max(0.0, min(100.0, stopper))),
-        "CCM.StageCode": int(stage_code),
+        "CCM.StageCode": int(state.stage_code),
         "CCM.StageName": stage_name,
-        "CCM.HeatNumber": int(heat_number),
-        "CCM.Ready": bool(interlock_ok and stage_name in {"PREPARE", "IDLE"}),
+        "CCM.HeatNumber": int(state.heat_number),
+        "CCM.Ready": bool(interlock_ok and not state.active),
         "CCM.Running": bool(casting_active),
         "CCM.Fault": bool(fault),
         "CCM.AlarmCode": int(alarm_code),

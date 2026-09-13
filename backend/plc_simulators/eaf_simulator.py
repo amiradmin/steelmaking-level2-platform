@@ -6,14 +6,26 @@ import math
 import os
 
 from common import run_plc_simulator
+from production_timeline import schedule, stage, timeline_state
 
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
 ENDPOINT = "opc.tcp://0.0.0.0:4840/eaf/"
 NAMESPACE_URI = "urn:steelmaking:plc:eaf"
-CYCLE_SECONDS = 240.0
 FAULT_MODE = os.getenv("PLC_SIM_FAULT_MODE", "NONE").strip().upper()
+
+SCHEDULE = schedule(
+    "EAF",
+    0.0,
+    (
+        stage("EAF", 1, "CHARGE", 7.0),
+        stage("EAF", 2, "MELTING", 35.0),
+        stage("EAF", 3, "REFINING", 13.0),
+        stage("EAF", 4, "SUPERHEAT", 5.0),
+        stage("EAF", 5, "TAPPING", 5.0),
+    ),
+)
 
 INITIAL_VALUES = {
     "EAF.PowerMW": 0.0,
@@ -25,7 +37,7 @@ INITIAL_VALUES = {
     "EAF.TransformerTap": 0,
     "EAF.StageCode": 0,
     "EAF.StageName": "IDLE",
-    "EAF.HeatNumber": 1000,
+    "EAF.HeatNumber": 260001,
     "EAF.Ready": True,
     "EAF.Running": False,
     "EAF.Fault": False,
@@ -47,20 +59,19 @@ def lerp(start: float, end: float, ratio: float) -> float:
 
 
 def values(elapsed: float, scan_counter: int) -> dict[str, object]:
-    cycle = elapsed % CYCLE_SECONDS
-    heat_number = 1000 + int(elapsed // CYCLE_SECONDS)
+    del scan_counter
+    state = timeline_state(SCHEDULE)
+    stage_name = state.stage_name
+    p = state.stage_progress
 
-    if cycle < 15.0:
-        stage_code, stage_name = 1, "CHARGE"
+    if stage_name == "CHARGE":
         power, current, oxygen = 0.0, 0.0, 0.0
         temp = 1450.0
         arc_on, oxygen_on, burner_on = False, False, False
         roof_closed = False
         transformer_tap = 0
         electrode = 90.0
-    elif cycle < 100.0:
-        p = (cycle - 15.0) / 85.0
-        stage_code, stage_name = 2, "MELTING"
+    elif stage_name == "MELTING":
         power = 63.0 + 5.0 * math.sin(elapsed / 4.0)
         current = 46.0 + 3.0 * math.sin(elapsed / 3.2)
         oxygen = 1200.0 + 350.0 * math.sin(elapsed / 8.0)
@@ -69,9 +80,7 @@ def values(elapsed: float, scan_counter: int) -> dict[str, object]:
         roof_closed = True
         transformer_tap = 14
         electrode = 48.0 + 6.0 * math.sin(elapsed / 5.0)
-    elif cycle < 170.0:
-        p = (cycle - 100.0) / 70.0
-        stage_code, stage_name = 3, "REFINING"
+    elif stage_name == "REFINING":
         power = 48.0 + 4.0 * math.sin(elapsed / 5.0)
         current = 38.0 + 2.0 * math.sin(elapsed / 4.0)
         oxygen = 3300.0 + 300.0 * math.sin(elapsed / 7.0)
@@ -80,9 +89,7 @@ def values(elapsed: float, scan_counter: int) -> dict[str, object]:
         roof_closed = True
         transformer_tap = 10
         electrode = 54.0 + 4.0 * math.sin(elapsed / 6.0)
-    elif cycle < 210.0:
-        p = (cycle - 170.0) / 40.0
-        stage_code, stage_name = 4, "SUPERHEAT"
+    elif stage_name == "SUPERHEAT":
         power = 39.0 + 3.0 * math.sin(elapsed / 4.5)
         current = 32.0 + 2.0 * math.sin(elapsed / 3.8)
         oxygen = 450.0
@@ -91,8 +98,7 @@ def values(elapsed: float, scan_counter: int) -> dict[str, object]:
         roof_closed = True
         transformer_tap = 8
         electrode = 58.0
-    elif cycle < 235.0:
-        stage_code, stage_name = 5, "TAPPING"
+    elif stage_name == "TAPPING":
         power, current, oxygen = 0.0, 0.0, 0.0
         temp = 1636.0 - 2.0 * math.sin(elapsed / 5.0)
         arc_on, oxygen_on, burner_on = False, False, False
@@ -100,7 +106,6 @@ def values(elapsed: float, scan_counter: int) -> dict[str, object]:
         transformer_tap = 0
         electrode = 95.0
     else:
-        stage_code, stage_name = 0, "IDLE"
         power, current, oxygen = 0.0, 0.0, 0.0
         temp = 1450.0
         arc_on, oxygen_on, burner_on = False, False, False
@@ -150,11 +155,11 @@ def values(elapsed: float, scan_counter: int) -> dict[str, object]:
         "EAF.ElectrodePositionPercent": float(electrode),
         "EAF.CoolingWaterFlowM3h": float(cooling_flow),
         "EAF.TransformerTap": int(transformer_tap),
-        "EAF.StageCode": int(stage_code),
+        "EAF.StageCode": int(state.stage_code),
         "EAF.StageName": stage_name,
-        "EAF.HeatNumber": int(heat_number),
-        "EAF.Ready": bool(interlock_ok and stage_name in {"IDLE", "CHARGE"}),
-        "EAF.Running": bool(stage_name != "IDLE"),
+        "EAF.HeatNumber": int(state.heat_number),
+        "EAF.Ready": bool(interlock_ok and not state.active),
+        "EAF.Running": bool(state.active),
         "EAF.Fault": bool(fault),
         "EAF.AlarmCode": int(alarm_code),
         "EAF.ArcOn": bool(arc_on),

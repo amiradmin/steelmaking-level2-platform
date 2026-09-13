@@ -7,6 +7,7 @@ cd "$ROOT_DIR"
 SPEED=120
 HEAT_NUMBER=260001
 FOLLOW=1
+BUILD_IMAGES=1
 
 usage() {
   cat <<'EOF'
@@ -18,12 +19,14 @@ Options:
   --speed N       Simulation speed multiplier (default: 120)
   --heat N        PLC heat number (default: 260001)
   --detach        Start the heat and return immediately
+  --skip-build    Reuse existing Docker images without rebuilding
   -h, --help      Show this help
 
 Examples:
   ./scripts/full_heat_demo.sh
   ./scripts/full_heat_demo.sh --speed 60 --heat 260010
   ./scripts/full_heat_demo.sh --speed 1 --detach
+  ./scripts/full_heat_demo.sh --skip-build
 EOF
 }
 
@@ -39,6 +42,10 @@ while (($#)); do
       ;;
     --detach)
       FOLLOW=0
+      shift
+      ;;
+    --skip-build)
+      BUILD_IMAGES=0
       shift
       ;;
     -h|--help)
@@ -71,6 +78,10 @@ export PLC_SIM_EPOCH_UNIX="$SIM_EPOCH"
 export PLC_SIM_HEAT_BASE="$HEAT_NUMBER"
 export PLC_SIM_HEAT_PITCH_MINUTES=70
 
+# Avoid simultaneous PyPI dependency downloads from multiple Compose builds.
+# This is especially important on slow or intermittent Docker networking.
+export COMPOSE_PARALLEL_LIMIT="${COMPOSE_PARALLEL_LIMIT:-1}"
+
 COMPOSE=(
   docker compose
   -f docker-compose.yml
@@ -86,10 +97,56 @@ printf 'Wall time:   ~%s seconds\n' "$EXPECTED_WALL_SECONDS"
 printf 'Start:       CHARGE\n'
 printf 'Finish:      END_CAST\n\n'
 
+build_service() {
+  local service="$1"
+  local attempt
+
+  for attempt in 1 2 3; do
+    printf 'Building %-28s attempt %d/3...\n' "$service" "$attempt"
+    if "${COMPOSE[@]}" build "$service"; then
+      return 0
+    fi
+
+    if (( attempt < 3 )); then
+      printf 'Build failed for %s; retrying in 5 seconds...\n' "$service" >&2
+      sleep 5
+    fi
+  done
+
+  printf 'ERROR: Docker build failed for %s after 3 attempts.\n' "$service" >&2
+  return 1
+}
+
+if (( BUILD_IMAGES == 1 )); then
+  printf 'Building required images serially to keep PyPI access stable...\n\n'
+
+  # Build the gateway first. It shares a locked BuildKit pip cache with the
+  # simulator and ingestor images, so large Python dependencies are reused.
+  build_service central-opcua-server
+  build_service eaf-plc-simulator
+  build_service plc-ingestor-central-test
+
+  # Application services are also built one at a time. BuildKit will return
+  # almost immediately when their layers have not changed.
+  build_service heat-management
+  build_service level2-api
+  build_service frontend
+
+  printf '\nAll required images are ready.\n\n'
+else
+  printf 'Skipping Docker image build and reusing existing images.\n\n'
+fi
+
 # Keep persistent services and historian data intact. Only the PLC path is
 # force-recreated so every demo starts at a fresh synchronized epoch.
-"${COMPOSE[@]}" up -d --build historian-db heat-management level2-api frontend nginx
-"${COMPOSE[@]}" up -d --build --force-recreate \
+"${COMPOSE[@]}" up -d --no-build \
+  historian-db \
+  heat-management \
+  level2-api \
+  frontend \
+  nginx
+
+"${COMPOSE[@]}" up -d --no-build --force-recreate \
   eaf-plc-simulator \
   lf-plc-simulator \
   ccm-plc-simulator \

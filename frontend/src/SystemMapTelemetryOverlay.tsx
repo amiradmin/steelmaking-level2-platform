@@ -65,6 +65,8 @@ export function SystemMapTelemetryOverlay() {
   }, [])
 
   useEffect(() => {
+    if (targets.length === 0) return
+
     let cancelled = false
     let timer: number | null = null
 
@@ -89,7 +91,7 @@ export function SystemMapTelemetryOverlay() {
       cancelled = true
       if (timer !== null) window.clearTimeout(timer)
     }
-  }, [])
+  }, [targets.length])
 
   return (
     <>

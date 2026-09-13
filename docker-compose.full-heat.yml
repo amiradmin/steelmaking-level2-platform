@@ -1,0 +1,12 @@
+services:
+  eaf-plc-simulator:
+    environment:
+      PLC_SIM_SINGLE_HEAT: "1"
+
+  lf-plc-simulator:
+    environment:
+      PLC_SIM_SINGLE_HEAT: "1"
+
+  ccm-plc-simulator:
+    environment:
+      PLC_SIM_SINGLE_HEAT: "1"

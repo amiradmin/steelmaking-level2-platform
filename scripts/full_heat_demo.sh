@@ -146,6 +146,12 @@ fi
   frontend \
   nginx
 
+# Nginx resolves Docker service names when its config is loaded. If an upstream
+# container was recreated and received a new IP address, a long-running Nginx
+# process can keep the stale upstream address and return 502. Restart it after
+# application services are healthy so Docker DNS is resolved again.
+"${COMPOSE[@]}" restart nginx
+
 "${COMPOSE[@]}" up -d --no-build --force-recreate \
   eaf-plc-simulator \
   lf-plc-simulator \

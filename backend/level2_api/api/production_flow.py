@@ -145,8 +145,40 @@ def _numeric_value(values: list[dict[str, Any]], tag_name: str) -> float | None:
         return None
 
 
-def _plc_stage_started_at(tag_name: str, current_code: int) -> datetime | None:
-    """Approximate the current PLC stage boundary from historian transitions."""
+def _current_run_started_at() -> datetime | None:
+    """Find the newest EAF 0 -> CHARGE transition to delimit the current demo run."""
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            WITH recent_eaf AS (
+                SELECT
+                    ps.ts,
+                    ps.value_double,
+                    LAG(ps.value_double) OVER (ORDER BY ps.ts) AS previous_value
+                FROM process_samples ps
+                JOIN process_tags pt ON pt.id = ps.tag_id
+                WHERE pt.tag_name = 'EAF.StageCode'
+                  AND ps.value_double IS NOT NULL
+                  AND ps.ts > now() - interval '6 hours'
+            )
+            SELECT ts
+            FROM recent_eaf
+            WHERE value_double = 1
+              AND COALESCE(previous_value, 0) <> 1
+            ORDER BY ts DESC
+            LIMIT 1
+            """
+        )
+        row = cursor.fetchone()
+        return row[0] if row and isinstance(row[0], datetime) else None
+
+
+def _plc_stage_started_at(
+    tag_name: str,
+    current_code: int,
+    run_started_at: datetime | None,
+) -> datetime | None:
+    """Approximate the current PLC stage boundary from this run's historian transitions."""
     with connection.cursor() as cursor:
         cursor.execute(
             """
@@ -156,10 +188,11 @@ def _plc_stage_started_at(tag_name: str, current_code: int) -> datetime | None:
             WHERE pt.tag_name = %s
               AND ps.value_double IS NOT NULL
               AND ps.value_double <> %s
+              AND ps.ts >= COALESCE(%s::timestamptz, '-infinity'::timestamptz)
             ORDER BY ps.ts DESC
             LIMIT 1
             """,
-            [tag_name, float(current_code)],
+            [tag_name, float(current_code), run_started_at],
         )
         row = cursor.fetchone()
         if row is not None and isinstance(row[0], datetime):
@@ -172,12 +205,40 @@ def _plc_stage_started_at(tag_name: str, current_code: int) -> datetime | None:
             JOIN process_tags pt ON pt.id = ps.tag_id
             WHERE pt.tag_name = %s
               AND ps.value_double = %s
-              AND ps.ts > now() - interval '10 minutes'
+              AND ps.ts >= COALESCE(%s::timestamptz, now() - interval '10 minutes')
             """,
-            [tag_name, float(current_code)],
+            [tag_name, float(current_code), run_started_at],
         )
         fallback = cursor.fetchone()
         return fallback[0] if fallback and isinstance(fallback[0], datetime) else None
+
+
+def _latest_nonzero_stage_code(
+    tag_name: str,
+    run_started_at: datetime | None,
+) -> int | None:
+    """Return the latest non-zero stage observed during the current run."""
+    if run_started_at is None:
+        return None
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT ps.value_double
+            FROM process_samples ps
+            JOIN process_tags pt ON pt.id = ps.tag_id
+            WHERE pt.tag_name = %s
+              AND ps.value_double IS NOT NULL
+              AND ps.value_double <> 0
+              AND ps.ts >= %s
+            ORDER BY ps.ts DESC
+            LIMIT 1
+            """,
+            [tag_name, run_started_at],
+        )
+        row = cursor.fetchone()
+        if not row or row[0] is None:
+            return None
+        return int(float(row[0]))
 
 
 def _station_state(*, index: int, active_index: int | None) -> str:
@@ -209,6 +270,7 @@ def production_flow(request: Request) -> Response:
     snapshot = build_dashboard_snapshot(stale_after_seconds=5.0)
     heat = snapshot["active_heat"]
     live_values = snapshot["live_values"]
+    run_started_at = _current_run_started_at()
     active_stage = _active_stage(heat["id"]) if heat else None
     active_area = active_stage.get("area") if active_stage else None
     if active_area is None and heat:
@@ -241,7 +303,7 @@ def production_flow(request: Request) -> Response:
         if plc_stage is not None:
             current_activity = str(plc_stage[0])
             stage_duration_seconds = int(float(plc_stage[1]) * 60.0)
-            stage_started_at = _plc_stage_started_at(stage_tag, stage_code)
+            stage_started_at = _plc_stage_started_at(stage_tag, stage_code, run_started_at)
             wall_age = _stage_age_seconds(stage_started_at)
             stage_age_seconds = (
                 min(stage_duration_seconds, int(wall_age * SIM_TIME_SCALE))
@@ -255,12 +317,15 @@ def production_flow(request: Request) -> Response:
             )
             state = "active"
         elif stage_code == 0 and stage_value is not None:
+            last_stage_code = _latest_nonzero_stage_code(stage_tag, run_started_at)
+            final_stage_code = max(definition["stages"])
+            completed_this_run = last_stage_code == final_stage_code
             current_activity = None
             stage_duration_seconds = None
             stage_started_at = None
             stage_age_seconds = None
-            progress = None
-            state = "ready"
+            progress = 100.0 if completed_this_run else None
+            state = "complete" if completed_this_run else "ready"
         else:
             is_active = index == active_index
             current_activity = (
@@ -316,6 +381,7 @@ def production_flow(request: Request) -> Response:
             "simulation": {
                 "time_scale": SIM_TIME_SCALE,
                 "heat_pitch_minutes": HEAT_PITCH_MINUTES,
+                "run_started_at": run_started_at,
             },
             "pipeline_heats": pipeline_heats,
             "stations": stations,

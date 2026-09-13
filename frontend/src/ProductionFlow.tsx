@@ -29,6 +29,7 @@ type FlowStation = {
 
 type ProductionFlowSnapshot = {
   generated_at: string
+  received_at?: string
   current_heat?: { heat_no?: string; grade_code?: string; status?: string } | null
   l1_link: { online: boolean; age_seconds?: number | null; last_sample_at?: string | null }
   simulation?: { time_scale?: number; heat_pitch_minutes?: number }
@@ -436,9 +437,13 @@ export function LiveProductionFlow() {
         const response = await authorizedFetch('/api/v1/production-flow')
         if (!response.ok) throw new Error('Production flow data is unavailable')
         const next = await response.json() as ProductionFlowSnapshot
+        const receivedAtMs = Date.now()
         if (!cancelled) {
-          setSnapshot(next)
-          setNowMs(Date.now())
+          setSnapshot({
+            ...next,
+            received_at: new Date(receivedAtMs).toISOString(),
+          })
+          setNowMs(receivedAtMs)
           setError(null)
         }
       } catch (requestError) {
@@ -523,7 +528,7 @@ export function LiveProductionFlow() {
                   station={station}
                   index={index}
                   nowMs={nowMs}
-                  generatedAt={snapshot.generated_at}
+                  generatedAt={snapshot.received_at ?? snapshot.generated_at}
                   timeScale={timeScale}
                 />
                 {index < snapshot.stations.length - 1 && (

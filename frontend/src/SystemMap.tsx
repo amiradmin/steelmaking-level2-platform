@@ -13,6 +13,9 @@ type SystemNode = {
   detail: string
   last_activity: string | null
   age_seconds: number | null
+  host?: string | null
+  ip?: string | null
+  port?: number | null
 }
 
 type SystemFlow = {
@@ -42,6 +45,10 @@ function elapsed(seconds: number | null): string {
   return `${seconds.toFixed(seconds < 10 ? 1 : 0)} s ago`
 }
 
+function endpointAddress(node: SystemNode): string {
+  return node.ip ?? node.host ?? '—'
+}
+
 function MapNode({ node }: { node: SystemNode }) {
   return (
     <article className={`system-map-node ${node.status}`}>
@@ -51,6 +58,10 @@ function MapNode({ node }: { node: SystemNode }) {
       </div>
       <strong>{node.label}</strong>
       <small>{node.role}</small>
+      <div className="system-map-endpoint" aria-label={`${node.label} network endpoint`}>
+        <span><b>IP</b><code>{endpointAddress(node)}</code></span>
+        <span><b>PORT</b><code>{node.port ?? '—'}</code></span>
+      </div>
       <p>{node.detail}</p>
       <time>{elapsed(node.age_seconds)}</time>
     </article>
@@ -95,7 +106,6 @@ export function LiveSystemMap({ telemetryStatus }: { telemetryStatus: TelemetryC
   const nodeById = useMemo(() => new Map(snapshot?.nodes.map((node) => [node.id, node]) ?? []), [snapshot])
   const flowByPath = useMemo(() => new Map(snapshot?.flows.map((flow) => [`${flow.from}:${flow.to}`, flow]) ?? []), [snapshot])
   const plcIds = ['eaf', 'lf', 'ccm']
-  const middleIds = ['opcua-gateway', 'plc-ingestor', 'historian']
   const deliveryIds = ['heat-management', 'level2-api', 'nginx', 'operator-console']
   const isLive = telemetryStatus === 'live'
 
@@ -130,7 +140,7 @@ export function LiveSystemMap({ telemetryStatus }: { telemetryStatus: TelemetryC
         <div className="system-map-row single-row"><MapNode node={nodeById.get('operator-console')!} /></div>
       </div>}
 
-      <footer className="system-map-legend"><span><i className="system-map-dot online" /> Live / healthy</span><span><i className="system-map-dot degraded" /> Delayed or reconnecting</span><span><i className="system-map-dot offline" /> No current signal</span><span>Flow arrows show actual freshest telemetry and service probes—not Docker process presence alone.</span></footer>
+      <footer className="system-map-legend"><span><i className="system-map-dot online" /> Live / healthy</span><span><i className="system-map-dot degraded" /> Delayed or reconnecting</span><span><i className="system-map-dot offline" /> No current signal</span><span>Each node shows its current resolved IP and listening port. Flow arrows show actual freshest telemetry and service probes.</span></footer>
     </section>
   )
 }

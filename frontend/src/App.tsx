@@ -7,6 +7,7 @@ import { HeatTracking } from './HeatTracking'
 import { EafDashboard } from './EafDashboard'
 import { LfDashboard } from './LfDashboard'
 import { CcmDashboard } from './CcmDashboard'
+import { DataHistorian } from './DataHistorian'
 import { AccessControl } from './AccessControl'
 import { OverviewLiveOverlay } from './OverviewLiveOverlay'
 import { PlcSourceOverlay } from './PlcSourceOverlay'
@@ -14,9 +15,9 @@ import { SystemMapTelemetryOverlay } from './SystemMapTelemetryOverlay'
 
 type Theme = 'dark' | 'light'
 type View = 'login' | 'dashboard'
-type DashboardPage = 'overview' | 'heat-tracking' | 'eaf' | 'lf' | 'ccm' | 'production-flow' | 'system-map' | 'access-control'
+type DashboardPage = 'overview' | 'heat-tracking' | 'eaf' | 'lf' | 'ccm' | 'historian' | 'production-flow' | 'system-map' | 'access-control'
 
-const dashboardPages: DashboardPage[] = ['overview', 'heat-tracking', 'eaf', 'lf', 'ccm', 'production-flow', 'system-map', 'access-control']
+const dashboardPages: DashboardPage[] = ['overview', 'heat-tracking', 'eaf', 'lf', 'ccm', 'historian', 'production-flow', 'system-map', 'access-control']
 
 function pageFromHash(): DashboardPage {
   const value = window.location.hash.replace(/^#\/?/, '')
@@ -120,7 +121,7 @@ const navItems: Array<{ icon: IconName; label: string; permission: string; page?
   { icon: 'ladle', label: 'Ladle Furnace (LF)', permission: 'production.view', page: 'lf' },
   { icon: 'cast', label: 'Continuous Casting (CCM)', permission: 'production.view', page: 'ccm' },
   { icon: 'inventory', label: 'Raw Materials & Charging', permission: 'production.view' },
-  { icon: 'history', label: 'Data Historian', permission: 'historian.view' },
+  { icon: 'history', label: 'Data Historian', permission: 'historian.view', page: 'historian' },
   { icon: 'chart', label: 'Reports & Analytics', permission: 'reports.view', enabled: false },
   { icon: 'alarm', label: 'Alarm Management', permission: 'alarms.view', badge: '3' },
   { icon: 'heat', label: 'Live Production Flow', permission: 'production.view', page: 'production-flow' },
@@ -451,9 +452,10 @@ function Dashboard({ theme, onThemeChange, onLogout, initialOperator }: { theme:
             : dashboardPage === 'eaf' && hasPermission('production.view') ? <EafDashboard />
               : dashboardPage === 'lf' && hasPermission('production.view') ? <LfDashboard />
                 : dashboardPage === 'ccm' && hasPermission('production.view') ? <CcmDashboard />
-                  : dashboardPage === 'production-flow' && hasPermission('production.view') ? <LiveProductionFlow />
-                    : dashboardPage === 'system-map' && hasPermission('plc.diagnostics') ? <LiveSystemMap telemetryStatus={telemetryStatus} />
-                      : dashboardPage === 'access-control' && hasPermission('users.manage') ? <AccessControl currentUsername={operator?.username ?? ''} /> : <>
+                  : dashboardPage === 'historian' && hasPermission('historian.view') ? <DataHistorian />
+                    : dashboardPage === 'production-flow' && hasPermission('production.view') ? <LiveProductionFlow />
+                      : dashboardPage === 'system-map' && hasPermission('plc.diagnostics') ? <LiveSystemMap telemetryStatus={telemetryStatus} />
+                        : dashboardPage === 'access-control' && hasPermission('users.manage') ? <AccessControl currentUsername={operator?.username ?? ''} /> : <>
           <div className="page-heading">
             <div><span className="section-kicker">LEVEL 2 OPERATIONS</span><h1>Steelmaking Operations Overview</h1><p>Integrated production monitoring from the electric arc furnace to continuous casting</p></div>
             <div className="update-state"><span className={`status-dot ${error || !realtimeHealthy ? 'warning' : 'online'}`} /><span><strong>{error ? 'Demo Data Mode' : realtimeHealthy ? 'Synced with Level 1' : 'Realtime Link Degraded'}</strong><small>Last updated: {formatClock(lastTelemetryAt)}</small></span></div>

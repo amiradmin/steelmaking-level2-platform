@@ -126,6 +126,10 @@ function elapsed(value?: string | null): string {
   return h > 0 ? `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}` : `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
 }
 
+function displayStage(value: string): string {
+  return value.split('_').join(' ')
+}
+
 function Sparkline({ samples }: { samples: TrendSample[] }) {
   const numeric = samples.filter((sample) => typeof sample.value_double === 'number').map((sample) => sample.value_double as number)
   if (numeric.length < 2) return <div className="eaf-no-trend">Waiting for historian samples…</div>
@@ -203,7 +207,7 @@ export function LfDashboard() {
 
       <section className="eaf-state-strip">
         <div><span>HEAT</span><strong>{heatNumber}</strong><small>{snapshot?.active_heat?.grade_code ?? 'Grade —'}</small></div>
-        <div><span>PROCESS STAGE</span><strong className="accent">{stageName.replaceAll('_', ' ')}</strong><small>{running === true ? 'RUNNING' : 'STANDBY'}</small></div>
+        <div><span>PROCESS STAGE</span><strong className="accent">{displayStage(stageName)}</strong><small>{running === true ? 'RUNNING' : 'STANDBY'}</small></div>
         <div><span>ELAPSED</span><strong>{elapsed(snapshot?.active_heat?.started_at)}</strong><small>Heat start</small></div>
         <div><span>READY</span><strong className={ready ? 'ok' : 'bad'}>{ready === null ? '—' : ready ? 'YES' : 'NO'}</strong><small>LF.Ready</small></div>
         <div><span>INTERLOCK</span><strong className={interlock ? 'ok' : 'bad'}>{interlock === null ? '—' : interlock ? 'OK' : 'NOT OK'}</strong><small>LF.InterlockOK</small></div>
@@ -237,7 +241,7 @@ export function LfDashboard() {
             <div className="eaf-stage-sequence">
               {STAGES.map((stage, index) => {
                 const state = stageIndex < 0 ? 'pending' : index < stageIndex ? 'done' : index === stageIndex ? 'active' : 'pending'
-                return <div className={`eaf-stage-step ${state}`} key={stage}><i>{index + 1}</i><span><strong>{stage.replaceAll('_', ' ')}</strong><small>{state === 'active' ? 'CURRENT SUB-PROCESS' : state.toUpperCase()}</small></span></div>
+                return <div className={`eaf-stage-step ${state}`} key={stage}><i>{index + 1}</i><span><strong>{displayStage(stage)}</strong><small>{state === 'active' ? 'CURRENT SUB-PROCESS' : state.toUpperCase()}</small></span></div>
               })}
             </div>
           </div>

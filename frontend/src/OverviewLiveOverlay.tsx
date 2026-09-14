@@ -183,7 +183,7 @@ function applyTrend(data: OverviewLive) {
     setText(metrics[3].querySelector('strong'), `${num(data.latest['CCM.CastingSpeed'], 2)} m/min`)
   }
   const zoom = panel.querySelector<HTMLButtonElement>('.outline-button')
-  if (zoom) { zoom.textContent = 'LIVE 60 MIN'; zoom.disabled = true }
+  if (zoom) { setText(zoom, 'LIVE 60 MIN'); zoom.disabled = true }
 }
 
 function applyRecentHeats(data: OverviewLive) {
@@ -234,19 +234,10 @@ export function OverviewLiveOverlay() {
   }, [])
 
   useEffect(() => {
-    const root = document.getElementById('root')
-    if (!root) return
-    let scheduled = false
-    const observer = new MutationObserver(() => {
-      if (scheduled || !latest.current) return
-      scheduled = true
-      window.requestAnimationFrame(() => {
-        scheduled = false
-        if (latest.current) applyOverview(latest.current)
-      })
-    })
-    observer.observe(root, { childList: true, subtree: true, characterData: true })
-    return () => observer.disconnect()
+    const timer = window.setInterval(() => {
+      if (latest.current) applyOverview(latest.current)
+    }, 500)
+    return () => window.clearInterval(timer)
   }, [])
   return null
 }

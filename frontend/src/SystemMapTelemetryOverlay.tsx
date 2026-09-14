@@ -24,12 +24,16 @@ type RawPacket = {
   payload_length: number
   protocol: string
   raw_hex: string
+  phase?: string | null
 }
 
 type PacketController = {
   host?: string | null
   resolved_ip?: string | null
   packets: RawPacket[]
+  read_only?: boolean
+  probe_mode?: string | null
+  error?: string | null
 }
 
 type PacketSnapshot = {
@@ -99,13 +103,20 @@ function chooseValues(area: string, values: HistorianValue[]): HistorianValue[] 
 }
 
 function directionLabel(direction: RawPacket['direction']): string {
-  return direction === 'PLC_TO_GATEWAY' ? 'PLC → GW' : 'GW → PLC'
+  return direction === 'PLC_TO_GATEWAY' ? 'PLC → LVL2' : 'LVL2 → PLC'
 }
 
 function endpoint(node?: SystemNode): string {
   if (!node) return '—'
   const address = node.ip ?? node.host ?? '—'
   return node.port ? `${address}:${node.port}` : address
+}
+
+function phaseLabel(packet: RawPacket): string {
+  if (!packet.phase) return directionLabel(packet.direction)
+  if (packet.phase === 'COTP_CONNECT_CONFIRM') return 'COTP CONNECT CONFIRM'
+  if (packet.phase === 'S7_SETUP_COMM_ACK') return 'S7 SETUP ACK'
+  return packet.phase.replaceAll('_', ' ')
 }
 
 export function SystemMapTelemetryOverlay() {
@@ -281,21 +292,21 @@ export function SystemMapTelemetryOverlay() {
 
                 <section className="system-map-raw-panel">
                   <div className="system-map-panel-title">
-                    <strong>RAW S7 TRAFFIC</strong>
-                    <small>{packets.length > 0 ? 'TCP/102 LIVE' : controller.isReal ? 'STANDBY' : packetSnapshot?.available ? 'WAITING' : 'WARMING UP'}</small>
+                    <strong>{controller.isReal ? 'RAW PLC RESPONSES' : 'RAW S7 TRAFFIC'}</strong>
+                    <small>{packets.length > 0 ? (controller.isReal ? 'S7 READ-ONLY LIVE' : 'TCP/102 LIVE') : packetController?.error ? 'PROBE ERROR' : 'WAITING'}</small>
                   </div>
 
                   <div className="system-map-packet-list">
                     {packets.length > 0 ? packets.slice(0, 4).map((packet) => (
-                      <div className="system-map-packet-row" key={packet.sequence}>
+                      <div className="system-map-packet-row" key={`${packet.sequence}-${packet.captured_at}`}>
                         <time>{displayTime(packet.captured_at, true)}</time>
-                        <strong>{directionLabel(packet.direction)}</strong>
+                        <strong>{controller.isReal ? phaseLabel(packet) : directionLabel(packet.direction)}</strong>
                         <span>{packet.payload_length} B</span>
                       </div>
                     )) : (
                       <div className="system-map-telemetry-empty">
                         {controller.isReal
-                          ? 'No passive S7 frames are being captured yet. The real PLC is currently monitored by a read-only reachability check and is not mapped into the Gateway data path.'
+                          ? (packetController?.error ?? 'Waiting for the next read-only S7 session response from the physical PLC…')
                           : 'Waiting for TCP/102 packets…'}
                       </div>
                     )}
@@ -308,7 +319,9 @@ export function SystemMapTelemetryOverlay() {
                         <b>→</b>
                         <span>{latestPacket.dst_ip}:{latestPacket.dst_port}</span>
                       </div>
-                      <div className="system-map-raw-label">RAW ETHERNET FRAME · HEX</div>
+                      <div className="system-map-raw-label">
+                        {controller.isReal ? `${phaseLabel(latestPacket)} · RAW RESPONSE · HEX` : 'RAW ETHERNET FRAME · HEX'}
+                      </div>
                       <code className="system-map-raw-hex">{latestPacket.raw_hex || 'No frame bytes captured yet.'}</code>
                     </div>
                   )}
@@ -317,7 +330,7 @@ export function SystemMapTelemetryOverlay() {
 
               <footer>
                 {controller.isReal
-                  ? 'The physical PLC connection is read-only. Raw process frames will appear here after the PLC is intentionally connected to the Gateway with a reviewed DB/tag map.'
+                  ? 'Right side shows bytes returned by the physical PLC during read-only COTP/S7 session negotiation. No DB Read, Write, Force, Start, Stop, or PLC-control request is sent. Actual process DB bytes can be shown after a reviewed real DB/tag map is supplied.'
                   : 'Left: decoded values consumed by Level 2. Right: passive raw TCP/102 capture from the Gateway network namespace.'}
               </footer>
             </div>

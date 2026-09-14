@@ -116,7 +116,7 @@ function phaseLabel(packet: RawPacket): string {
   if (!packet.phase) return directionLabel(packet.direction)
   if (packet.phase === 'COTP_CONNECT_CONFIRM') return 'COTP CONNECT CONFIRM'
   if (packet.phase === 'S7_SETUP_COMM_ACK') return 'S7 SETUP ACK'
-  return packet.phase.replaceAll('_', ' ')
+  return packet.phase.split('_').join(' ')
 }
 
 export function SystemMapTelemetryOverlay() {

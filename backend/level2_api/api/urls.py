@@ -15,6 +15,7 @@ from .overview_live import overview_live
 from .plc_packets import plc_packets
 from .plc_sources import plc_sources
 from .production_flow import production_flow
+from .reports_dashboard import reports_dashboard
 from .system_map import live_system_map
 
 urlpatterns = [
@@ -28,6 +29,7 @@ urlpatterns = [
     path("lf/dashboard", lf_dashboard, name="lf-dashboard"),
     path("ccm/dashboard", ccm_dashboard, name="ccm-dashboard"),
     path("materials/dashboard", materials_dashboard, name="materials-dashboard"),
+    path("reports/dashboard", reports_dashboard, name="reports-dashboard"),
     path("production-flow", production_flow, name="production-flow"),
     path("plc-sources", plc_sources, name="plc-sources"),
     path("plc-packets", plc_packets, name="plc-packets"),

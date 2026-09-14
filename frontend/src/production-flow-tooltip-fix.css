@@ -1,0 +1,19 @@
+.production-route-item:first-child .production-activity > .production-activity-tooltip {
+  top: calc(100% + 8px);
+  bottom: auto;
+  transform-origin: top right;
+  transform: translateY(-5px) scale(.985);
+}
+
+.production-route-item:first-child .production-activity:hover > .production-activity-tooltip,
+.production-route-item:first-child .production-activity:focus > .production-activity-tooltip {
+  transform: translateY(0) scale(1);
+}
+
+@media (max-width: 760px) {
+  .production-route-item:first-child .production-activity > .production-activity-tooltip {
+    right: -4px;
+    top: calc(100% + 8px);
+    bottom: auto;
+  }
+}

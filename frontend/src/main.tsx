@@ -5,6 +5,7 @@ import { LicenseNotice } from './LicenseNotice'
 import { PlcSourceOverlay } from './PlcSourceOverlay'
 import { SystemMapTelemetryOverlay } from './SystemMapTelemetryOverlay'
 import './styles.css'
+import './production-flow-tooltip-fix.css'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

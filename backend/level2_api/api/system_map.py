@@ -44,6 +44,13 @@ def _status_from_timestamp(value: Any) -> str:
     return "offline"
 
 
+def _env_int(name: str, default: int) -> int:
+    try:
+        return int(os.getenv(name, str(default)))
+    except ValueError:
+        return default
+
+
 def _service_health(url: str) -> bool:
     """Perform a small bounded health probe over the internal Compose network."""
     try:
@@ -61,6 +68,15 @@ def _resolve_ip(host: str | None) -> str | None:
         return socket.gethostbyname(host)
     except OSError:
         return None
+
+
+def _tcp_reachable(host: str, port: int) -> bool:
+    """Check TCP reachability without sending an application payload."""
+    try:
+        with socket.create_connection((host, port), timeout=1.0):
+            return True
+    except OSError:
+        return False
 
 
 def _latest_controller_samples() -> dict[str, dict[str, Any]]:
@@ -146,21 +162,27 @@ def live_system_map(request: Request) -> Response:
     opcua_last_sample = _latest_opcua_sample()
     heat_management_online = _service_health("http://heat-management:9000/health")
 
+    real_plc_host = os.getenv("REAL_PLC_HOST", "192.168.1.10").strip() or "192.168.1.10"
+    real_plc_port = _env_int("REAL_PLC_PORT", 102)
+    real_plc_rack = _env_int("REAL_PLC_RACK", 0)
+    real_plc_slot = _env_int("REAL_PLC_SLOT", 3)
+    real_plc_online = _tcp_reachable(real_plc_host, real_plc_port)
+
     controller_config = {
         "eaf": (
             "EAF PLC / S7-400",
             os.getenv("EAF_PLC_HOST", "eaf-plc-simulator").strip() or "eaf-plc-simulator",
-            int(os.getenv("EAF_PLC_PORT", "102")),
+            _env_int("EAF_PLC_PORT", 102),
         ),
         "lf": (
             "LF PLC / S7-400",
             os.getenv("LF_PLC_HOST", "lf-plc-simulator").strip() or "lf-plc-simulator",
-            int(os.getenv("LF_PLC_PORT", "102")),
+            _env_int("LF_PLC_PORT", 102),
         ),
         "ccm": (
             "CCM PLC / S7-400",
             os.getenv("CCM_PLC_HOST", "ccm-plc-simulator").strip() or "ccm-plc-simulator",
-            int(os.getenv("CCM_PLC_PORT", "102")),
+            _env_int("CCM_PLC_PORT", 102),
         ),
     }
 
@@ -185,6 +207,15 @@ def live_system_map(request: Request) -> Response:
     opcua_status = _status_from_timestamp(opcua_last_sample)
     nodes = [
         *controller_nodes,
+        _node(
+            "real-plc",
+            "REAL PLC / CPU 417-4H",
+            f"Siemens S7-400H · Rack {real_plc_rack} / Slot {real_plc_slot}",
+            "online" if real_plc_online else "offline",
+            "READ ONLY · TCP/102 reachable" if real_plc_online else "READ ONLY · waiting for TCP/102",
+            host=real_plc_host,
+            port=real_plc_port,
+        ),
         _node(
             "opcua-gateway",
             "Central OPC UA Gateway",
@@ -262,6 +293,7 @@ def live_system_map(request: Request) -> Response:
                 for controller_id in ("eaf", "lf", "ccm")
             ]
             + [
+                {"from": "real-plc", "to": "opcua-gateway", "status": "idle", "label": "standby / read-only"},
                 {"from": "opcua-gateway", "to": "plc-ingestor", "status": opcua_status, "label": "OPC UA"},
                 {"from": "plc-ingestor", "to": "historian", "status": opcua_status, "label": "normalized samples"},
                 {"from": "historian", "to": "heat-management", "status": "online" if heat_management_online else "offline", "label": "heat events"},

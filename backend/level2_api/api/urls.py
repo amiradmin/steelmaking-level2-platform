@@ -6,6 +6,7 @@ from . import views
 from .access_control import roles as access_roles
 from .access_control import user_detail as access_user_detail
 from .access_control import users as access_users
+from .eaf_dashboard import eaf_dashboard
 from .heat_timeline import heat_timeline
 from .overview_live import overview_live
 from .plc_packets import plc_packets
@@ -20,6 +21,7 @@ urlpatterns = [
     path("access/users/<int:user_id>", access_user_detail, name="access-user-detail"),
     path("meta", views.api_meta, name="api-meta"),
     path("overview-live", overview_live, name="overview-live"),
+    path("eaf/dashboard", eaf_dashboard, name="eaf-dashboard"),
     path("production-flow", production_flow, name="production-flow"),
     path("plc-sources", plc_sources, name="plc-sources"),
     path("plc-packets", plc_packets, name="plc-packets"),

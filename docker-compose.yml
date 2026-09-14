@@ -241,6 +241,25 @@ services:
     networks:
       - level2-net
 
+  alarm-processor:
+    build:
+      context: ./backend/alarm_processor
+    container_name: steelmaking-level2-alarm-processor
+    restart: unless-stopped
+    depends_on:
+      historian-db:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      DB_HOST: historian-db
+      DB_PORT: 5432
+      ALARM_PROCESSOR_POLL_SECONDS: ${ALARM_PROCESSOR_POLL_SECONDS:-1}
+      ALARM_PROCESSOR_STALE_SECONDS: ${ALARM_PROCESSOR_STALE_SECONDS:-10}
+      ALARM_PROCESSOR_RECONNECT_SECONDS: ${ALARM_PROCESSOR_RECONNECT_SECONDS:-3}
+    networks:
+      - level2-net
+
   heat-management:
     build:
       context: ./backend/heat_management
@@ -320,7 +339,7 @@ services:
       test:
         - CMD
         - wget
-        - -q
+        -q
         - -O
         - /dev/null
         - http://127.0.0.1/frontend-health

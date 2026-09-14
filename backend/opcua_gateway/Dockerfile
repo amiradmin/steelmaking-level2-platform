@@ -14,6 +14,7 @@ ARG PIP_TRUSTED_HOST=
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
       ca-certificates \
+      tcpdump \
       python3-aiofiles \
       python3-aiosqlite \
       python3-cryptography \
@@ -39,7 +40,7 @@ RUN --mount=type=cache,id=steelmaking-pip-cache,target=/root/.cache/pip,sharing=
       "https://files.pythonhosted.org/packages/3f/0d/2f8fc320a12b6c8b972568a588ae57f4db7e9f7e7f53d02a24d0cebb17d7/asyncua-1.1.8-py3-none-any.whl#sha256=40c57151b93537beb77cb3f1a0190d75cef5326e8c40978de28b69e5b41e6ede" && \
     python -c "import asyncua, cryptography, OpenSSL; print('Central OPC UA dependency check OK')"
 
-COPY opcua_gateway/gateway.py opcua_gateway/healthcheck.py opcua_gateway/s7_probe.py ./
+COPY opcua_gateway/gateway.py opcua_gateway/healthcheck.py opcua_gateway/s7_probe.py opcua_gateway/packet_monitor.py ./
 COPY plc_simulators/s7_address_map.json ./s7_address_map.json
 
 HEALTHCHECK --interval=10s --timeout=4s --start-period=20s --retries=3 \

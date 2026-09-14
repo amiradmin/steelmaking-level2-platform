@@ -29,10 +29,32 @@ type LiveValue = {
 type HeatEvent = {
   event_type: string
   source_system?: string | null
+  source_event_id?: string | null
   area?: string | null
+  equipment_code?: string | null
   severity?: string | null
   occurred_at?: string | null
   payload?: Record<string, unknown> | null
+}
+
+type HeatStageRecord = {
+  stage: string
+  equipment_code?: string | null
+  status?: string | null
+  started_at?: string | null
+  ended_at?: string | null
+  attributes?: Record<string, unknown> | null
+}
+
+type HeatTimeline = {
+  heat_no: string
+  status: string
+  started_at?: string | null
+  completed_at?: string | null
+  updated_at?: string | null
+  stages: HeatStageRecord[]
+  events: HeatEvent[]
+  source?: string | null
 }
 
 type MaterialSummary = {
@@ -62,12 +84,19 @@ type HeatOverview = {
 
 type StageId = 'CHARGE' | 'EAF' | 'LF' | 'CCM'
 type StageState = 'done' | 'active' | 'pending'
+type TimingSource = 'HEAT_STAGE' | 'STATUS_EVENT' | 'AREA_EVENT' | 'NONE'
 
 type Stage = {
   id: StageId
   title: string
   equipment: string
   aliases: string[]
+}
+
+type StageTiming = {
+  start?: string
+  end?: string
+  source: TimingSource
 }
 
 const STAGES: Stage[] = [
@@ -79,6 +108,7 @@ const STAGES: Stage[] = [
 
 const STATUS_RANK: Record<string, number> = {
   PLANNED: -1,
+  CREATED: -1,
   CHARGING: 0,
   CHARGE: 0,
   EAF: 1,
@@ -156,18 +186,89 @@ function stageState(stageIndex: number, status?: string | null): StageState {
   return 'pending'
 }
 
-function areaTimes(events: HeatEvent[], stage: Stage): { start?: string; end?: string } {
-  const matching = events
-    .filter((event) => {
-      const area = (event.area ?? '').toUpperCase()
-      const eventType = (event.event_type ?? '').toUpperCase()
-      return stage.aliases.some((alias) => area.includes(alias) || eventType.includes(alias))
+function normalizedStatus(value: unknown): string {
+  return typeof value === 'string' ? value.trim().toUpperCase() : ''
+}
+
+function payloadStatus(event: HeatEvent, key: 'from' | 'to'): string {
+  return normalizedStatus(event.payload?.[key])
+}
+
+function stageOwnsStatus(stage: Stage, status: string): boolean {
+  return stage.aliases.some((alias) => alias === status)
+}
+
+function stageTiming(stage: Stage, records: HeatStageRecord[], events: HeatEvent[]): StageTiming {
+  const persisted = records
+    .filter((record) => {
+      const name = normalizedStatus(record.stage)
+      return stage.aliases.some((alias) => name === alias || name.includes(alias))
     })
-    .map((event) => event.occurred_at)
-    .filter((value): value is string => Boolean(value))
-    .sort()
-  if (matching.length === 0) return {}
-  return { start: matching[0], end: matching.length > 1 ? matching[matching.length - 1] : undefined }
+    .filter((record) => Boolean(record.started_at))
+    .sort((left, right) => String(left.started_at).localeCompare(String(right.started_at)))
+
+  if (persisted.length > 0) {
+    const first = persisted[0]
+    const ended = persisted
+      .map((record) => record.ended_at)
+      .filter((value): value is string => Boolean(value))
+      .sort()
+    return {
+      start: first.started_at ?? undefined,
+      end: ended.length > 0 ? ended[ended.length - 1] : undefined,
+      source: 'HEAT_STAGE',
+    }
+  }
+
+  const ordered = events
+    .filter((event) => Boolean(event.occurred_at))
+    .slice()
+    .sort((left, right) => String(left.occurred_at).localeCompare(String(right.occurred_at)))
+
+  let start: string | undefined
+  let end: string | undefined
+  for (const event of ordered) {
+    if ((event.event_type ?? '').toUpperCase() !== 'STATUS_CHANGED' || !event.occurred_at) continue
+    const from = payloadStatus(event, 'from')
+    const to = payloadStatus(event, 'to')
+    if (!start && stageOwnsStatus(stage, to) && !stageOwnsStatus(stage, from)) {
+      start = event.occurred_at
+      continue
+    }
+    if (start && stageOwnsStatus(stage, from) && !stageOwnsStatus(stage, to)) {
+      end = event.occurred_at
+      break
+    }
+  }
+  if (start) return { start, end, source: 'STATUS_EVENT' }
+
+  const areaEvidence = ordered.filter((event) => {
+    const area = normalizedStatus(event.area)
+    const eventType = normalizedStatus(event.event_type)
+    return stage.aliases.some((alias) => area.includes(alias) || eventType.includes(alias))
+  })
+  if (areaEvidence.length > 0) {
+    return {
+      start: areaEvidence[0].occurred_at ?? undefined,
+      end: areaEvidence.length > 1 ? areaEvidence[areaEvidence.length - 1].occurred_at ?? undefined : undefined,
+      source: 'AREA_EVENT',
+    }
+  }
+
+  return { source: 'NONE' }
+}
+
+function resolvedStageState(stageIndex: number, status: string, timing: StageTiming): StageState {
+  if (timing.start && timing.end) return 'done'
+  if (timing.start && !timing.end && !ACTIVE_TERMINAL.has(status.toUpperCase())) return 'active'
+  return stageState(stageIndex, status)
+}
+
+function timingSourceLabel(source: TimingSource): string {
+  if (source === 'HEAT_STAGE') return 'persisted stage timestamps'
+  if (source === 'STATUS_EVENT') return 'lifecycle event timestamps'
+  if (source === 'AREA_EVENT') return 'Level 1 area event timestamps'
+  return 'awaiting lifecycle evidence'
 }
 
 function stageMetrics(stage: StageId, values: LiveValue[]): Array<[string, string]> {
@@ -207,6 +308,7 @@ export function HeatTracking() {
   const [heats, setHeats] = useState<Heat[]>([])
   const [selectedHeatNo, setSelectedHeatNo] = useState<string | null>(null)
   const [overview, setOverview] = useState<HeatOverview | null>(null)
+  const [timeline, setTimeline] = useState<HeatTimeline | null>(null)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('ALL')
   const [loading, setLoading] = useState(true)
@@ -254,6 +356,7 @@ export function HeatTracking() {
   useEffect(() => {
     if (!selectedHeatNo) {
       setOverview(null)
+      setTimeline(null)
       return
     }
     let cancelled = false
@@ -261,11 +364,20 @@ export function HeatTracking() {
 
     const refresh = async () => {
       try {
-        const response = await authorizedFetch(`/api/v1/heats/${encodeURIComponent(selectedHeatNo)}/overview`)
-        if (!response.ok) throw new Error(`Heat overview returned ${response.status}`)
-        const payload = await response.json() as HeatOverview
+        const heatPath = encodeURIComponent(selectedHeatNo)
+        const [overviewResponse, timelineResponse] = await Promise.all([
+          authorizedFetch(`/api/v1/heats/${heatPath}/overview`),
+          authorizedFetch(`/api/v1/heats/${heatPath}/timeline`),
+        ])
+        if (!overviewResponse.ok) throw new Error(`Heat overview returned ${overviewResponse.status}`)
+        if (!timelineResponse.ok) throw new Error(`Heat timeline returned ${timelineResponse.status}`)
+        const [overviewPayload, timelinePayload] = await Promise.all([
+          overviewResponse.json() as Promise<HeatOverview>,
+          timelineResponse.json() as Promise<HeatTimeline>,
+        ])
         if (!cancelled) {
-          setOverview(payload)
+          setOverview(overviewPayload)
+          setTimeline(timelinePayload)
           setError(null)
         }
       } catch (requestError) {
@@ -295,7 +407,9 @@ export function HeatTracking() {
 
   const selected = overview?.heat ?? heats.find((heat) => heat.heat_no === selectedHeatNo) ?? null
   const values = overview?.live_values ?? []
-  const events = overview?.recent_events ?? []
+  const lifecycleEvents = timeline?.events ?? overview?.recent_events ?? []
+  const recentEvents = lifecycleEvents.slice().reverse()
+  const stageRecords = timeline?.stages ?? []
   const materials = overview?.material_summary ?? []
   const alarms = overview?.active_alarms ?? []
   const liveTemperature = selected?.status?.toUpperCase() === 'CASTING'
@@ -377,19 +491,21 @@ export function HeatTracking() {
             </section>
 
             <section className="heat-route-card">
-              <div className="heat-section-heading"><div><span className="section-kicker">PROCESS ROUTE</span><h2>Charge → EAF → LF → CCM</h2></div><span className="heat-route-state">Updated {fmtClock(selected.updated_at)}</span></div>
+              <div className="heat-section-heading"><div><span className="section-kicker">PROCESS ROUTE · EVENT DERIVED</span><h2>Charge → EAF → LF → CCM</h2></div><span className="heat-route-state">EVENT TIMELINE · Updated {fmtClock(timeline?.updated_at ?? selected.updated_at)}</span></div>
               <div className="heat-route-timeline">
                 {STAGES.map((stage, index) => {
-                  const state = stageState(index, selected.status)
-                  const times = areaTimes(events, stage)
+                  const timing = stageTiming(stage, stageRecords, lifecycleEvents)
+                  const state = resolvedStageState(index, selected.status, timing)
                   const metrics = stageMetrics(stage.id, values)
-                  const stageEnd = state === 'active' ? undefined : times.end
+                  const fallbackStart = stage.id === 'EAF' && index === currentRank(selected.status) ? selected.started_at ?? undefined : undefined
+                  const stageStart = timing.start ?? fallbackStart
+                  const stageEnd = state === 'active' ? undefined : timing.end
                   return (
                     <article className={`heat-stage ${state}`} key={stage.id}>
                       <div className="heat-stage-marker"><span>{index + 1}</span></div>
                       <div className="heat-stage-body">
-                        <header><div><strong>{stage.title}</strong><small>{stage.equipment}</small></div><em>{state.toUpperCase()}</em></header>
-                        <div className="heat-stage-time"><span>START <b>{fmtClock(times.start ?? (index === 0 ? selected.started_at : null))}</b></span><span>END <b>{state === 'active' ? 'LIVE' : fmtClock(stageEnd)}</b></span><span>DURATION <b>{duration(times.start ?? (index === 0 ? selected.started_at : null), stageEnd)}</b></span></div>
+                        <header><div><strong>{stage.title}</strong><small>{stage.equipment} · {timingSourceLabel(timing.source)}</small></div><em>{state.toUpperCase()}</em></header>
+                        <div className="heat-stage-time"><span>START <b>{fmtClock(stageStart)}</b></span><span>END <b>{state === 'active' ? 'LIVE' : fmtClock(stageEnd)}</b></span><span>DURATION <b>{duration(stageStart, stageEnd)}</b></span></div>
                         {metrics.length > 0 && <div className="heat-stage-metrics">{metrics.map(([label, value]) => <span key={label}><small>{label}</small><strong>{value}</strong></span>)}</div>}
                       </div>
                     </article>
@@ -400,12 +516,12 @@ export function HeatTracking() {
 
             <div className="heat-detail-grid">
               <section className="heat-side-card">
-                <div className="heat-section-heading compact"><div><span className="section-kicker">RECENT EVENTS</span><h2>Lifecycle Event Log</h2></div><span>{events.length}</span></div>
+                <div className="heat-section-heading compact"><div><span className="section-kicker">LIFECYCLE EVENTS</span><h2>Complete Event Log</h2></div><span>{lifecycleEvents.length}</span></div>
                 <div className="heat-event-list">
-                  {events.length === 0 ? <div className="heat-card-empty">No heat events have been recorded yet.</div> : events.slice(0, 10).map((event, index) => (
-                    <div className="heat-event-row" key={`${event.event_type}-${event.occurred_at ?? index}`}>
+                  {recentEvents.length === 0 ? <div className="heat-card-empty">No heat events have been recorded yet.</div> : recentEvents.slice(0, 10).map((event, index) => (
+                    <div className="heat-event-row" key={`${event.source_event_id ?? event.event_type}-${event.occurred_at ?? index}`}>
                       <span className="heat-event-time">{fmtClock(event.occurred_at)}</span>
-                      <span><strong>{event.event_type}</strong><small>{event.area ?? event.source_system ?? 'LEVEL 2'} · {event.severity ?? 'INFO'}</small></span>
+                      <span><strong>{event.event_type}</strong><small>{event.area ?? event.equipment_code ?? event.source_system ?? 'LEVEL 2'} · {event.severity ?? 'INFO'}</small></span>
                     </div>
                   ))}
                 </div>

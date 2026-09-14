@@ -8,6 +8,7 @@ import { EafDashboard } from './EafDashboard'
 import { LfDashboard } from './LfDashboard'
 import { CcmDashboard } from './CcmDashboard'
 import { DataHistorian } from './DataHistorian'
+import { AlarmManagement } from './AlarmManagement'
 import { AccessControl } from './AccessControl'
 import { OverviewLiveOverlay } from './OverviewLiveOverlay'
 import { PlcSourceOverlay } from './PlcSourceOverlay'
@@ -15,9 +16,9 @@ import { SystemMapTelemetryOverlay } from './SystemMapTelemetryOverlay'
 
 type Theme = 'dark' | 'light'
 type View = 'login' | 'dashboard'
-type DashboardPage = 'overview' | 'heat-tracking' | 'eaf' | 'lf' | 'ccm' | 'historian' | 'production-flow' | 'system-map' | 'access-control'
+type DashboardPage = 'overview' | 'heat-tracking' | 'eaf' | 'lf' | 'ccm' | 'historian' | 'alarms' | 'production-flow' | 'system-map' | 'access-control'
 
-const dashboardPages: DashboardPage[] = ['overview', 'heat-tracking', 'eaf', 'lf', 'ccm', 'historian', 'production-flow', 'system-map', 'access-control']
+const dashboardPages: DashboardPage[] = ['overview', 'heat-tracking', 'eaf', 'lf', 'ccm', 'historian', 'alarms', 'production-flow', 'system-map', 'access-control']
 
 function pageFromHash(): DashboardPage {
   const value = window.location.hash.replace(/^#\/?/, '')
@@ -123,7 +124,7 @@ const navItems: Array<{ icon: IconName; label: string; permission: string; page?
   { icon: 'inventory', label: 'Raw Materials & Charging', permission: 'production.view' },
   { icon: 'history', label: 'Data Historian', permission: 'historian.view', page: 'historian' },
   { icon: 'chart', label: 'Reports & Analytics', permission: 'reports.view', enabled: false },
-  { icon: 'alarm', label: 'Alarm Management', permission: 'alarms.view', badge: '3' },
+  { icon: 'alarm', label: 'Alarm Management', permission: 'alarms.view', page: 'alarms' },
   { icon: 'heat', label: 'Live Production Flow', permission: 'production.view', page: 'production-flow' },
   { icon: 'link', label: 'Live System Map', permission: 'plc.diagnostics', page: 'system-map' },
   { icon: 'settings', label: 'Access Control', permission: 'users.manage', page: 'access-control' },
@@ -453,9 +454,10 @@ function Dashboard({ theme, onThemeChange, onLogout, initialOperator }: { theme:
               : dashboardPage === 'lf' && hasPermission('production.view') ? <LfDashboard />
                 : dashboardPage === 'ccm' && hasPermission('production.view') ? <CcmDashboard />
                   : dashboardPage === 'historian' && hasPermission('historian.view') ? <DataHistorian />
-                    : dashboardPage === 'production-flow' && hasPermission('production.view') ? <LiveProductionFlow />
-                      : dashboardPage === 'system-map' && hasPermission('plc.diagnostics') ? <LiveSystemMap telemetryStatus={telemetryStatus} />
-                        : dashboardPage === 'access-control' && hasPermission('users.manage') ? <AccessControl currentUsername={operator?.username ?? ''} /> : <>
+                    : dashboardPage === 'alarms' && hasPermission('alarms.view') ? <AlarmManagement />
+                      : dashboardPage === 'production-flow' && hasPermission('production.view') ? <LiveProductionFlow />
+                        : dashboardPage === 'system-map' && hasPermission('plc.diagnostics') ? <LiveSystemMap telemetryStatus={telemetryStatus} />
+                          : dashboardPage === 'access-control' && hasPermission('users.manage') ? <AccessControl currentUsername={operator?.username ?? ''} /> : <>
           <div className="page-heading">
             <div><span className="section-kicker">LEVEL 2 OPERATIONS</span><h1>Steelmaking Operations Overview</h1><p>Integrated production monitoring from the electric arc furnace to continuous casting</p></div>
             <div className="update-state"><span className={`status-dot ${error || !realtimeHealthy ? 'warning' : 'online'}`} /><span><strong>{error ? 'Demo Data Mode' : realtimeHealthy ? 'Synced with Level 1' : 'Realtime Link Degraded'}</strong><small>Last updated: {formatClock(lastTelemetryAt)}</small></span></div>

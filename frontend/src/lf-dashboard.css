@@ -1,0 +1,33 @@
+.lf-page .eaf-kpi-grid article { border-top-color: color-mix(in srgb, var(--primary) 62%, var(--cyan)); }
+.lf-page .eaf-state-strip strong.accent { color: var(--primary); }
+.lf-page .eaf-stage-step.active { border-color: color-mix(in srgb, var(--primary) 55%, var(--border)); background: color-mix(in srgb, var(--primary) 9%, var(--surface)); box-shadow: inset 3px 0 0 var(--primary); }
+.lf-page .eaf-stage-step.active > i { color: var(--primary); border-color: var(--primary); box-shadow: 0 0 11px color-mix(in srgb, var(--primary) 35%, transparent); }
+.lf-page .eaf-stage-step.active strong { color: var(--primary); }
+.lf-page .eaf-spark-line { stroke: var(--primary); filter: drop-shadow(0 0 3px color-mix(in srgb, var(--primary) 45%, transparent)); }
+
+.lf-vessel-scene { position: relative; height: 280px; overflow: hidden; border: 1px solid var(--border-soft); border-radius: 12px; background: radial-gradient(circle at 50% 70%, color-mix(in srgb, var(--primary) 12%, transparent), transparent 35%), linear-gradient(180deg, color-mix(in srgb, var(--surface-2) 96%, transparent), var(--surface)); }
+.lf-vessel { position: absolute; left: 23%; right: 23%; bottom: 31px; height: 135px; overflow: hidden; border: 4px solid color-mix(in srgb, var(--text-2) 70%, var(--border)); border-top-width: 8px; border-radius: 12px 12px 66px 66px; background: color-mix(in srgb, var(--surface-2) 88%, black); }
+.lf-steel { position: absolute; left: 6px; right: 6px; bottom: 6px; height: 63%; border-radius: 7px 7px 52px 52px; background: linear-gradient(180deg, color-mix(in srgb, var(--amber) 88%, white 5%), color-mix(in srgb, var(--red) 70%, var(--amber))); box-shadow: 0 -8px 28px color-mix(in srgb, var(--amber) 42%, transparent); animation: lf-bath-pulse 1.8s ease-in-out infinite alternate; }
+.lf-roof { position: absolute; left: 26%; right: 26%; bottom: 164px; height: 25px; border: 3px solid color-mix(in srgb, var(--text-2) 64%, var(--border)); border-radius: 50% 50% 10px 10px; background: var(--surface-2); }
+.lf-electrodes { position: absolute; left: 36%; right: 36%; top: 19px; height: 129px; display: flex; justify-content: space-between; z-index: 4; }
+.lf-electrodes i { width: 15px; border-radius: 6px; background: linear-gradient(90deg, color-mix(in srgb, var(--text-2) 72%, black), var(--text-2), color-mix(in srgb, var(--text-2) 72%, black)); box-shadow: 0 0 0 1px var(--border); }
+.lf-arcs { position: absolute; left: 37%; right: 37%; top: 144px; height: 46px; display: flex; justify-content: space-between; opacity: 0; z-index: 5; }
+.lf-arcs.on { opacity: 1; }
+.lf-arcs i { width: 2px; height: 40px; transform: skewX(-8deg); background: white; box-shadow: 0 0 5px white, 0 0 13px var(--cyan), 0 0 23px var(--primary); animation: lf-arc-flicker .18s steps(2, end) infinite; }
+.lf-argon { position: absolute; left: 34%; right: 34%; bottom: 44px; height: 74px; pointer-events: none; opacity: .15; }
+.lf-argon.on { opacity: 1; }
+.lf-argon i { position: absolute; bottom: 0; width: 8px; height: 8px; border: 1px solid var(--cyan); border-radius: 50%; animation: lf-bubble 1.3s ease-in infinite; }
+.lf-argon i:nth-child(1) { left: 10%; animation-delay: -.2s; }
+.lf-argon i:nth-child(2) { left: 35%; animation-delay: -.75s; }
+.lf-argon i:nth-child(3) { left: 60%; animation-delay: -.45s; }
+.lf-argon i:nth-child(4) { left: 83%; animation-delay: -1s; }
+.lf-temperature { position: absolute; right: 14px; bottom: 12px; color: var(--amber); font: 700 13px 'JetBrains Mono', monospace; text-shadow: 0 0 10px color-mix(in srgb, var(--amber) 50%, transparent); }
+.lf-ladle-weight { position: absolute; left: 14px; bottom: 12px; color: var(--text-2); font: 700 10px 'JetBrains Mono', monospace; }
+
+@keyframes lf-bath-pulse { from { filter: brightness(.92); } to { filter: brightness(1.08); } }
+@keyframes lf-arc-flicker { 0% { transform: skewX(-8deg) translateX(-1px); opacity: .6; } 50% { transform: skewX(7deg) translateX(1px); opacity: 1; } 100% { transform: skewX(-3deg); opacity: .75; } }
+@keyframes lf-bubble { 0% { transform: translateY(0) scale(.7); opacity: 0; } 20% { opacity: .95; } 100% { transform: translateY(-68px) scale(1.4); opacity: 0; } }
+
+@media (max-width: 900px) {
+  .lf-vessel-scene { height: 240px; }
+}

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 import os
 import random
@@ -38,6 +39,15 @@ class Phase:
     complete_event: str
 
 
+@dataclass(frozen=True)
+class MaterialAddition:
+    code: str
+    name: str
+    quantity: float
+    unit: str
+    batch_prefix: str
+
+
 PHASES: Final[tuple[Phase, ...]] = (
     Phase("EAF", "EAF", "EAF-01", "EAF_START", "EAF_COMPLETE"),
     Phase("LF", "LF", "LF-01", "LF_START", "LF_COMPLETE"),
@@ -58,6 +68,28 @@ PHASE_TAGS: Final[dict[str, tuple[str, ...]]] = {
     "CCM": (
         "CCM.CastingSpeed",
         "CCM.TundishTemperature",
+    ),
+}
+
+# This recipe is simulation-only test data. It is written to the Level 2
+# material record with source_system=SIMULATOR so it cannot be confused with
+# a real scale, batching system, PLC, or MES material transaction.
+PHASE_MATERIALS: Final[dict[str, tuple[MaterialAddition, ...]]] = {
+    "EAF": (
+        MaterialAddition("SCRAP-HMS", "Heavy Melting Scrap", 54.0, "t", "SCR"),
+        MaterialAddition("DRI", "Direct Reduced Iron", 20.0, "t", "DRI"),
+        MaterialAddition("LIME", "Burnt Lime", 2.30, "t", "LIM"),
+        MaterialAddition("DOLOMITE", "Dolomitic Lime", 0.95, "t", "DOL"),
+        MaterialAddition("CARBON", "Injected Carbon", 520.0, "kg", "CAR"),
+    ),
+    "LF": (
+        MaterialAddition("FEMN", "Ferromanganese", 310.0, "kg", "FMN"),
+        MaterialAddition("FESI", "Ferrosilicon", 185.0, "kg", "FSI"),
+        MaterialAddition("AL-WIRE", "Aluminium Wire", 82.0, "kg", "ALW"),
+        MaterialAddition("LF-LIME", "Ladle Furnace Lime", 430.0, "kg", "LFL"),
+    ),
+    "CCM": (
+        MaterialAddition("CAST-POWDER", "Mould Casting Powder", 115.0, "kg", "MCP"),
     ),
 }
 
@@ -202,6 +234,78 @@ def insert_event(
     )
 
 
+def write_material_recipe(
+    conn: Connection,
+    *,
+    heat_id: str,
+    heat_no: str,
+    phase: Phase,
+    equipment_id: str,
+) -> None:
+    """Write one deterministic simulated recipe per heat/phase, idempotently."""
+    additions = PHASE_MATERIALS.get(phase.name, ())
+    for index, addition in enumerate(additions, start=1):
+        recipe_key = f"{phase.name}:{addition.code}:{index}"
+        exists = conn.execute(
+            """
+            SELECT 1
+            FROM material_consumptions
+            WHERE heat_id = %s::uuid
+              AND source_system = 'SIMULATOR'
+              AND attributes->>'recipe_key' = %s
+            LIMIT 1
+            """,
+            (heat_id, recipe_key),
+        ).fetchone()
+        if exists:
+            continue
+
+        batch_no = f"{addition.batch_prefix}-{heat_no[-8:]}-{index:02d}"
+        attributes = json.dumps(
+            {
+                "simulator": True,
+                "phase": phase.name,
+                "recipe_key": recipe_key,
+                "data_classification": "SIMULATION_ONLY",
+            }
+        )
+        conn.execute(
+            """
+            INSERT INTO material_consumptions (
+                heat_id,
+                equipment_id,
+                material_code,
+                material_name,
+                quantity,
+                unit,
+                addition_time,
+                source_system,
+                batch_no,
+                attributes
+            )
+            VALUES (%s::uuid, %s::uuid, %s, %s, %s, %s, now(), 'SIMULATOR', %s, %s::jsonb)
+            """,
+            (
+                heat_id,
+                equipment_id,
+                addition.code,
+                addition.name,
+                addition.quantity,
+                addition.unit,
+                batch_no,
+                attributes,
+            ),
+        )
+        LOGGER.info(
+            "Heat %s %s simulated material: %s %.3f %s",
+            heat_no,
+            phase.name,
+            addition.code,
+            addition.quantity,
+            addition.unit,
+        )
+
+
 def start_stage(
     conn: Connection,
     *,
@@ -228,6 +332,13 @@ def start_stage(
         phase=phase,
         equipment_id=equipment_id,
         event_type=phase.start_event,
+    )
+    write_material_recipe(
+        conn,
+        heat_id=heat_id,
+        heat_no=heat_no,
+        phase=phase,
+        equipment_id=equipment_id,
     )
     LOGGER.info("Heat %s entered %s", heat_no, phase.name)
 

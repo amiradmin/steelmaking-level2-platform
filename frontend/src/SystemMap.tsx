@@ -124,8 +124,25 @@ export function LiveSystemMap({ telemetryStatus }: { telemetryStatus: TelemetryC
         <div className="system-map-row plc-row">
           {plcIds.map((id) => <MapNode key={id} node={nodeById.get(id)!} />)}
         </div>
-        <div className="system-map-fan">
-          {plcIds.map((id) => <Flow key={id} flow={flowByPath.get(`${id}:opcua-gateway`)!} />)}
+        <div className="system-map-fan unified" aria-label="PLC connections converging to Central OPC UA Gateway">
+          {plcIds.map((id) => {
+            const flow = flowByPath.get(`${id}:opcua-gateway`)
+            const status = flow?.status ?? 'idle'
+            return (
+              <div
+                key={id}
+                className={`system-map-fan-leg ${status}`}
+                title={`${flow?.label ?? 'PLC telemetry'}: ${statusCopy[status]}`}
+              >
+                <i />
+              </div>
+            )
+          })}
+          <div className="system-map-fan-bus" />
+          <div className="system-map-fan-trunk">
+            <i />
+            <small>PLC telemetry</small>
+          </div>
         </div>
         <div className="system-map-row single-row"><MapNode node={nodeById.get('opcua-gateway')!} /></div>
         <Flow flow={flowByPath.get('opcua-gateway:plc-ingestor')!} />

@@ -9,7 +9,7 @@
 .system-map-overall.degraded strong { color: var(--amber); }
 .system-map-canvas { padding: 32px 24px 28px; border: 1px solid var(--border); border-radius: 16px; background: radial-gradient(circle at 50% 10%, var(--primary-soft), transparent 32%), linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px), var(--surface); background-size: auto, 36px 36px, 36px 36px, auto; box-shadow: var(--shadow); }
 .system-map-row { display: flex; align-items: stretch; justify-content: center; gap: 18px; }
-.system-map-node { position: relative; width: min(242px, 100%); min-height: 150px; padding: 13px 14px 12px; display: flex; flex-direction: column; border: 1px solid var(--border); border-top: 3px solid var(--node-color); border-radius: 12px; background: color-mix(in srgb, var(--surface-2) 92%, transparent); box-shadow: 0 10px 26px rgba(0, 0, 0, .12); }
+.system-map-node { position: relative; width: min(242px, 100%); min-height: 188px; padding: 13px 14px 12px; display: flex; flex-direction: column; border: 1px solid var(--border); border-top: 3px solid var(--node-color); border-radius: 12px; background: color-mix(in srgb, var(--surface-2) 92%, transparent); box-shadow: 0 10px 26px rgba(0, 0, 0, .12); }
 .system-map-node.online { --node-color: var(--cyan); }
 .system-map-node.degraded { --node-color: var(--amber); }
 .system-map-node.offline { --node-color: var(--red); }
@@ -18,7 +18,12 @@
 .system-map-node-top code { color: var(--node-color); font: 700 8px 'JetBrains Mono', monospace; letter-spacing: .08em; }
 .system-map-node strong { font-size: 13px; line-height: 1.3; }
 .system-map-node > small { margin-top: 4px; color: var(--primary); font: 600 9px 'JetBrains Mono', monospace; }
-.system-map-node p { min-height: 27px; margin: 12px 0 7px; color: var(--text-2); font-size: 10px; line-height: 1.4; }
+.system-map-endpoint { margin-top: 10px; padding: 7px 8px; display: grid; gap: 4px; border: 1px solid var(--border-soft); border-radius: 8px; background: color-mix(in srgb, var(--surface) 72%, transparent); }
+.system-map-endpoint span { display: grid; grid-template-columns: 34px minmax(0, 1fr); align-items: center; gap: 7px; }
+.system-map-endpoint b { color: var(--muted); font: 700 7px 'JetBrains Mono', monospace; letter-spacing: .08em; }
+.system-map-endpoint code { min-width: 0; overflow: hidden; color: var(--text-2); font: 600 9px 'JetBrains Mono', monospace; text-overflow: ellipsis; white-space: nowrap; }
+.system-map-endpoint span:first-child code { color: var(--cyan); }
+.system-map-node p { min-height: 27px; margin: 10px 0 7px; color: var(--text-2); font-size: 10px; line-height: 1.4; }
 .system-map-node time { margin-top: auto; color: var(--muted); font: 500 9px 'JetBrains Mono', monospace; }
 .system-map-dot { width: 8px; height: 8px; display: inline-block; border-radius: 50%; background: currentColor; box-shadow: 0 0 11px currentColor; }
 .system-map-dot.online { color: var(--cyan); }

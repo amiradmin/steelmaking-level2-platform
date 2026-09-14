@@ -77,6 +77,7 @@ def main() -> None:
             "tcpdump",
             "-i",
             CAPTURE_INTERFACE,
+            "-p",
             "-nn",
             "-tttt",
             "-s",

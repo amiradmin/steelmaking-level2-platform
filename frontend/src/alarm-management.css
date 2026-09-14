@@ -1,0 +1,115 @@
+.alarm-management-page { display: grid; gap: 16px; }
+.alarm-management-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; }
+.alarm-management-heading h1 { margin: 7px 0 5px; font-size: 28px; }
+.alarm-management-heading p { margin: 0; max-width: 760px; color: var(--muted); font-size: 10px; line-height: 1.6; }
+.alarm-stream-health { min-width: 230px; padding: 11px 13px; display: flex; align-items: center; gap: 10px; border: 1px solid color-mix(in srgb, var(--cyan) 30%, var(--border)); border-radius: 11px; background: color-mix(in srgb, var(--cyan) 6%, var(--surface)); }
+.alarm-stream-health.warning { border-color: color-mix(in srgb, var(--amber) 34%, var(--border)); background: color-mix(in srgb, var(--amber) 7%, var(--surface)); }
+.alarm-stream-health > span:last-child { display: flex; flex-direction: column; gap: 2px; }
+.alarm-stream-health strong { color: var(--cyan); font: 700 9px 'JetBrains Mono', monospace; letter-spacing: .05em; }
+.alarm-stream-health.warning strong { color: var(--amber); }
+.alarm-stream-health small { color: var(--muted); font-size: 8px; }
+.alarm-stream-dot { width: 9px; height: 9px; flex: 0 0 auto; border-radius: 50%; background: var(--cyan); box-shadow: 0 0 12px var(--cyan); }
+.alarm-stream-health.warning .alarm-stream-dot { background: var(--amber); box-shadow: 0 0 12px var(--amber); }
+.alarm-management-notice { padding: 10px 13px; border: 1px solid color-mix(in srgb, var(--amber) 38%, var(--border)); border-radius: 10px; color: var(--amber); background: color-mix(in srgb, var(--amber) 8%, var(--surface)); font-size: 9px; }
+
+.alarm-summary-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 11px; }
+.alarm-summary-grid article { min-width: 0; padding: 14px; display: flex; flex-direction: column; gap: 5px; border: 1px solid var(--border); border-top: 2px solid var(--border); border-radius: 11px; background: var(--surface); box-shadow: var(--shadow); }
+.alarm-summary-grid article.active { border-top-color: var(--amber); }
+.alarm-summary-grid article.critical { border-top-color: var(--red); }
+.alarm-summary-grid article.ack { border-top-color: var(--cyan); }
+.alarm-summary-grid span { color: var(--muted); font-size: 9px; }
+.alarm-summary-grid strong { color: var(--text); font: 700 25px 'JetBrains Mono', monospace; }
+.alarm-summary-grid article.critical strong { color: var(--red); }
+.alarm-summary-grid article.active strong { color: var(--amber); }
+.alarm-summary-grid article.ack strong { color: var(--cyan); }
+.alarm-summary-grid small { color: var(--text-2); font: 600 8px 'JetBrains Mono', monospace; }
+
+.alarm-area-strip { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
+.alarm-area-strip button { min-width: 0; padding: 10px 12px; display: grid; grid-template-columns: 1fr auto; grid-template-areas: 'name count' 'meta count'; align-items: center; gap: 1px 8px; text-align: left; border: 1px solid var(--border); border-radius: 9px; color: var(--text); background: var(--surface); cursor: pointer; }
+.alarm-area-strip button:hover, .alarm-area-strip button.selected { border-color: color-mix(in srgb, var(--cyan) 42%, var(--border)); background: color-mix(in srgb, var(--cyan) 7%, var(--surface)); }
+.alarm-area-strip span { grid-area: name; color: var(--text-2); font: 700 9px 'JetBrains Mono', monospace; }
+.alarm-area-strip strong { grid-area: count; color: var(--cyan); font: 700 20px 'JetBrains Mono', monospace; }
+.alarm-area-strip small { grid-area: meta; color: var(--muted); font: 600 7px 'JetBrains Mono', monospace; }
+
+.alarm-toolbar { padding: 10px; display: flex; align-items: center; justify-content: space-between; gap: 12px; border: 1px solid var(--border); border-radius: 11px; background: var(--surface); }
+.alarm-mode-tabs { display: flex; gap: 5px; flex-wrap: wrap; }
+.alarm-mode-tabs button, .alarm-filter-controls button { padding: 8px 11px; border: 1px solid var(--border); border-radius: 8px; color: var(--muted); background: var(--surface-2); cursor: pointer; font: 700 8px 'JetBrains Mono', monospace; }
+.alarm-mode-tabs button.active { color: var(--cyan); border-color: color-mix(in srgb, var(--cyan) 45%, var(--border)); background: color-mix(in srgb, var(--cyan) 8%, var(--surface)); }
+.alarm-filter-controls { display: flex; align-items: center; gap: 7px; }
+.alarm-filter-controls input, .alarm-filter-controls select { height: 34px; border: 1px solid var(--border); border-radius: 8px; color: var(--text); background: var(--surface-2); font-size: 9px; }
+.alarm-filter-controls input { width: 230px; padding: 0 10px; }
+.alarm-filter-controls select { padding: 0 9px; }
+
+.alarm-main-grid { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(320px, .7fr); gap: 14px; align-items: start; }
+.alarm-list-panel, .alarm-detail-panel { min-width: 0; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); box-shadow: var(--shadow); overflow: hidden; }
+.alarm-panel-title { min-height: 58px; padding: 12px 14px; display: flex; align-items: center; justify-content: space-between; gap: 12px; border-bottom: 1px solid var(--border-soft); }
+.alarm-panel-title h2 { margin: 3px 0 0; font-size: 14px; }
+.alarm-panel-title > span { color: var(--muted); font: 700 8px 'JetBrains Mono', monospace; }
+
+.alarm-record-list { max-height: 625px; overflow: auto; }
+.alarm-record { position: relative; width: 100%; min-height: 82px; padding: 11px 12px; display: grid; grid-template-columns: 7px minmax(0, 1fr) 118px; align-items: stretch; gap: 10px; text-align: left; border: 0; border-bottom: 1px solid var(--border-soft); color: var(--text); background: transparent; cursor: pointer; }
+.alarm-record:hover, .alarm-record.selected { background: var(--surface-2); }
+.alarm-record.selected { box-shadow: inset 3px 0 0 var(--cyan); }
+.alarm-record-indicator { width: 6px; align-self: stretch; min-height: 54px; border-radius: 999px; background: var(--muted); opacity: .8; }
+.alarm-record.critical .alarm-record-indicator { background: var(--red); box-shadow: 0 0 11px color-mix(in srgb, var(--red) 45%, transparent); }
+.alarm-record.warning .alarm-record-indicator { background: var(--amber); box-shadow: 0 0 11px color-mix(in srgb, var(--amber) 36%, transparent); }
+.alarm-record.info .alarm-record-indicator { background: var(--cyan); }
+.alarm-record-copy { min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 5px; }
+.alarm-record-meta { display: flex; align-items: center; gap: 7px; }
+.alarm-record-meta b { color: var(--text-2); font: 800 7px 'JetBrains Mono', monospace; letter-spacing: .06em; }
+.alarm-record.critical .alarm-record-meta b { color: var(--red); }
+.alarm-record.warning .alarm-record-meta b { color: var(--amber); }
+.alarm-record-meta code { padding: 2px 5px; border: 1px solid var(--border-soft); border-radius: 5px; color: var(--cyan); background: var(--surface); font: 700 7px 'JetBrains Mono', monospace; }
+.alarm-record-meta em { margin-left: auto; color: var(--muted); font: 700 7px 'JetBrains Mono', monospace; font-style: normal; }
+.alarm-record-copy strong { overflow: hidden; font-size: 10px; line-height: 1.45; text-overflow: ellipsis; white-space: nowrap; }
+.alarm-record-copy small { overflow: hidden; color: var(--muted); font: 600 7px 'JetBrains Mono', monospace; text-overflow: ellipsis; white-space: nowrap; }
+.alarm-record-time { display: flex; flex-direction: column; align-items: flex-end; justify-content: center; gap: 4px; }
+.alarm-record-time time { color: var(--text-2); font: 600 7px 'JetBrains Mono', monospace; text-align: right; }
+.alarm-record-time small { color: var(--muted); font: 700 8px 'JetBrains Mono', monospace; }
+
+.alarm-detail-panel { position: sticky; top: 12px; }
+.alarm-detail-severity { padding: 5px 8px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface-2); }
+.alarm-detail-severity.critical { color: var(--red); border-color: color-mix(in srgb, var(--red) 42%, var(--border)); }
+.alarm-detail-severity.warning { color: var(--amber); border-color: color-mix(in srgb, var(--amber) 42%, var(--border)); }
+.alarm-detail-severity.info { color: var(--cyan); border-color: color-mix(in srgb, var(--cyan) 42%, var(--border)); }
+.alarm-detail-message { margin: 13px; padding: 12px; display: flex; flex-direction: column; gap: 5px; border: 1px solid var(--border-soft); border-radius: 9px; background: var(--surface-2); }
+.alarm-detail-message span, .alarm-payload > span { color: var(--muted); font: 700 7px 'JetBrains Mono', monospace; letter-spacing: .08em; }
+.alarm-detail-message strong { font-size: 10px; line-height: 1.55; }
+.alarm-detail-grid { margin: 0 13px; display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+.alarm-detail-grid > div { min-width: 0; padding: 8px; border: 1px solid var(--border-soft); border-radius: 8px; background: var(--surface-2); }
+.alarm-detail-grid dt { color: var(--muted); font-size: 7px; }
+.alarm-detail-grid dd { margin: 3px 0 0; overflow: hidden; color: var(--text-2); font: 700 8px 'JetBrains Mono', monospace; text-overflow: ellipsis; white-space: nowrap; }
+
+.alarm-lifecycle { margin: 13px; display: grid; gap: 7px; }
+.alarm-lifecycle-step { position: relative; min-height: 45px; display: grid; grid-template-columns: 29px 1fr; align-items: center; gap: 9px; }
+.alarm-lifecycle-step:not(:last-child)::after { content: ''; position: absolute; left: 14px; bottom: -8px; width: 1px; height: 15px; background: var(--border); }
+.alarm-lifecycle-step > i { width: 28px; height: 28px; display: grid; place-items: center; border: 1px solid var(--border); border-radius: 50%; color: var(--muted); background: var(--surface-2); font: 700 8px 'JetBrains Mono', monospace; font-style: normal; }
+.alarm-lifecycle-step.done > i { color: var(--cyan); border-color: color-mix(in srgb, var(--cyan) 45%, var(--border)); background: color-mix(in srgb, var(--cyan) 8%, var(--surface)); }
+.alarm-lifecycle-step.current > i { color: var(--amber); border-color: var(--amber); box-shadow: 0 0 10px color-mix(in srgb, var(--amber) 28%, transparent); }
+.alarm-lifecycle-step > span { display: flex; flex-direction: column; gap: 2px; }
+.alarm-lifecycle-step strong { font-size: 9px; }
+.alarm-lifecycle-step small { color: var(--muted); font: 600 7px 'JetBrains Mono', monospace; }
+.alarm-payload { margin: 13px; display: grid; gap: 6px; }
+.alarm-payload pre { margin: 0; max-height: 150px; overflow: auto; padding: 9px; border: 1px solid var(--border-soft); border-radius: 8px; color: var(--text-2); background: var(--surface-2); font: 600 7px/1.55 'JetBrains Mono', monospace; white-space: pre-wrap; word-break: break-word; }
+.alarm-readonly-note { margin: 13px; padding: 9px; border: 1px dashed color-mix(in srgb, var(--cyan) 28%, var(--border)); border-radius: 8px; color: var(--muted); background: color-mix(in srgb, var(--cyan) 4%, var(--surface)); font: 700 7px 'JetBrains Mono', monospace; text-align: center; }
+.alarm-empty-state { min-height: 160px; padding: 24px; display: grid; place-items: center; align-content: center; gap: 5px; color: var(--muted); text-align: center; }
+.alarm-empty-state strong { color: var(--text-2); font-size: 10px; }
+.alarm-empty-state small { font-size: 8px; }
+
+@media (max-width: 1120px) {
+  .alarm-summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .alarm-area-strip { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .alarm-main-grid { grid-template-columns: 1fr; }
+  .alarm-detail-panel { position: static; }
+}
+
+@media (max-width: 760px) {
+  .alarm-management-heading, .alarm-toolbar { align-items: stretch; flex-direction: column; }
+  .alarm-stream-health { min-width: 0; }
+  .alarm-summary-grid, .alarm-area-strip { grid-template-columns: 1fr 1fr; }
+  .alarm-filter-controls { align-items: stretch; flex-direction: column; }
+  .alarm-filter-controls input { width: auto; }
+  .alarm-record { grid-template-columns: 6px 1fr; }
+  .alarm-record-time { grid-column: 2; align-items: flex-start; }
+  .alarm-detail-grid { grid-template-columns: 1fr; }
+}

@@ -10,6 +10,7 @@ from .ccm_dashboard import ccm_dashboard
 from .eaf_dashboard import eaf_dashboard
 from .heat_timeline import heat_timeline
 from .lf_dashboard import lf_dashboard
+from .materials_dashboard import materials_dashboard
 from .overview_live import overview_live
 from .plc_packets import plc_packets
 from .plc_sources import plc_sources
@@ -26,6 +27,7 @@ urlpatterns = [
     path("eaf/dashboard", eaf_dashboard, name="eaf-dashboard"),
     path("lf/dashboard", lf_dashboard, name="lf-dashboard"),
     path("ccm/dashboard", ccm_dashboard, name="ccm-dashboard"),
+    path("materials/dashboard", materials_dashboard, name="materials-dashboard"),
     path("production-flow", production_flow, name="production-flow"),
     path("plc-sources", plc_sources, name="plc-sources"),
     path("plc-packets", plc_packets, name="plc-packets"),

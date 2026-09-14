@@ -38,7 +38,7 @@ RUN --mount=type=cache,id=steelmaking-pip-cache,target=/root/.cache/pip,sharing=
     fi && \
     python -m pip install --retries 10 --timeout 120 --no-deps \
       "https://files.pythonhosted.org/packages/3f/0d/2f8fc320a12b6c8b972568a588ae57f4db7e9f7e7f53d02a24d0cebb17d7/asyncua-1.1.8-py3-none-any.whl#sha256=40c57151b93537beb77cb3f1a0190d75cef5326e8c40978de28b69e5b41e6ede" && \
-    python -c "import asyncua, cryptography, OpenSSL; print('Central OPC UA dependency check OK')"
+    python -c "from datetime import datetime, timezone; import asyncua, cryptography, OpenSSL; from asyncua import ua; now=datetime.now(timezone.utc); ua.DataValue(ua.Variant(1), ua.StatusCode(ua.StatusCodes.Good), SourceTimestamp=now, ServerTimestamp=now); print('Central OPC UA dependency check OK')"
 
 COPY opcua_gateway/gateway.py opcua_gateway/healthcheck.py opcua_gateway/s7_probe.py opcua_gateway/packet_monitor.py ./
 COPY plc_simulators/s7_address_map.json ./s7_address_map.json

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+import socket
 from datetime import datetime, timezone
 from typing import Any
 from urllib.error import URLError
@@ -49,6 +51,16 @@ def _service_health(url: str) -> bool:
             return 200 <= response.status < 300
     except (OSError, URLError):
         return False
+
+
+def _resolve_ip(host: str | None) -> str | None:
+    """Resolve a configured host through Docker DNS or return the literal IP."""
+    if not host:
+        return None
+    try:
+        return socket.gethostbyname(host)
+    except OSError:
+        return None
 
 
 def _latest_controller_samples() -> dict[str, dict[str, Any]]:
@@ -107,6 +119,9 @@ def _node(
     status: str,
     detail: str,
     last_activity: Any = None,
+    *,
+    host: str | None = None,
+    port: int | None = None,
 ) -> dict[str, Any]:
     return {
         "id": identifier,
@@ -116,6 +131,9 @@ def _node(
         "detail": detail,
         "last_activity": _iso(last_activity),
         "age_seconds": _age_seconds(last_activity),
+        "host": host,
+        "ip": _resolve_ip(host),
+        "port": port,
     }
 
 
@@ -128,8 +146,26 @@ def live_system_map(request: Request) -> Response:
     opcua_last_sample = _latest_opcua_sample()
     heat_management_online = _service_health("http://heat-management:9000/health")
 
+    controller_config = {
+        "eaf": (
+            "EAF PLC / S7-400",
+            os.getenv("EAF_PLC_HOST", "eaf-plc-simulator").strip() or "eaf-plc-simulator",
+            int(os.getenv("EAF_PLC_PORT", "102")),
+        ),
+        "lf": (
+            "LF PLC / S7-400",
+            os.getenv("LF_PLC_HOST", "lf-plc-simulator").strip() or "lf-plc-simulator",
+            int(os.getenv("LF_PLC_PORT", "102")),
+        ),
+        "ccm": (
+            "CCM PLC / S7-400",
+            os.getenv("CCM_PLC_HOST", "ccm-plc-simulator").strip() or "ccm-plc-simulator",
+            int(os.getenv("CCM_PLC_PORT", "102")),
+        ),
+    }
+
     controller_nodes = []
-    for controller_id, label in (("eaf", "EAF PLC / S7-400"), ("lf", "LF PLC / S7-400"), ("ccm", "CCM PLC / S7-400")):
+    for controller_id, (label, host, port) in controller_config.items():
         telemetry = controllers[controller_id]
         last_sample = telemetry.get("last_sample_at")
         sample_count = telemetry.get("samples_last_window", 0)
@@ -141,6 +177,8 @@ def live_system_map(request: Request) -> Response:
                 _status_from_timestamp(last_sample),
                 f"{sample_count} samples in the last {int(FRESH_AFTER_SECONDS)} s",
                 last_sample,
+                host=host,
+                port=port,
             )
         )
 
@@ -154,6 +192,8 @@ def live_system_map(request: Request) -> Response:
             opcua_status,
             "Central namespace and PLC tag mapping",
             opcua_last_sample,
+            host="central-opcua-server",
+            port=4840,
         ),
         _node(
             "plc-ingestor",
@@ -162,6 +202,8 @@ def live_system_map(request: Request) -> Response:
             opcua_status,
             "Last successful OPC-UA historian write",
             opcua_last_sample,
+            host="plc-ingestor-central-test",
+            port=None,
         ),
         _node(
             "historian",
@@ -169,6 +211,8 @@ def live_system_map(request: Request) -> Response:
             "TimescaleDB",
             "online",
             "Database query is reachable",
+            host="historian-db",
+            port=5432,
         ),
         _node(
             "heat-management",
@@ -176,6 +220,8 @@ def live_system_map(request: Request) -> Response:
             "Process lifecycle service",
             "online" if heat_management_online else "offline",
             "Internal /health probe",
+            host="heat-management",
+            port=9000,
         ),
         _node(
             "level2-api",
@@ -183,6 +229,8 @@ def live_system_map(request: Request) -> Response:
             "Django REST + WebSocket",
             "online",
             "This live status response is being served",
+            host="level2-api",
+            port=8080,
         ),
         _node(
             "nginx",
@@ -190,6 +238,8 @@ def live_system_map(request: Request) -> Response:
             "Reverse proxy",
             "online",
             "The browser reached the API through the application gateway",
+            host="nginx",
+            port=80,
         ),
         _node(
             "operator-console",
@@ -197,6 +247,8 @@ def live_system_map(request: Request) -> Response:
             "React live dashboard",
             "online",
             "Current authenticated browser session",
+            host="frontend",
+            port=80,
         ),
     ]
 

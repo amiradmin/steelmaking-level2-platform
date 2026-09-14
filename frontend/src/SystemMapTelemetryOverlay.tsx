@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { KeyboardEvent, MouseEvent, useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { authorizedFetch } from './auth'
 import './system-map-telemetry-overlay.css'
@@ -39,11 +39,35 @@ type PacketSnapshot = {
   controllers: Record<string, PacketController>
 }
 
-const CONTROLLERS = [
-  { id: 'eaf', area: 'EAF', label: 'EAF PLC / S7-400' },
-  { id: 'lf', area: 'LF', label: 'LF PLC / S7-400' },
-  { id: 'ccm', area: 'CCM', label: 'CCM PLC / S7-400' },
-] as const
+type SystemNode = {
+  id: string
+  label: string
+  role: string
+  status: 'online' | 'degraded' | 'offline' | 'idle'
+  detail: string
+  host?: string | null
+  ip?: string | null
+  port?: number | null
+}
+
+type SystemMapSnapshot = {
+  nodes: SystemNode[]
+}
+
+type ControllerDefinition = {
+  id: string
+  area: string | null
+  packetKey: string
+  label: string
+  isReal?: boolean
+}
+
+const CONTROLLERS: ControllerDefinition[] = [
+  { id: 'eaf', area: 'EAF', packetKey: 'EAF', label: 'EAF PLC / S7-400' },
+  { id: 'lf', area: 'LF', packetKey: 'LF', label: 'LF PLC / S7-400' },
+  { id: 'ccm', area: 'CCM', packetKey: 'CCM', label: 'CCM PLC / S7-400' },
+  { id: 'real-plc', area: null, packetKey: 'REAL', label: 'REAL PLC / CPU 417-4H', isReal: true },
+]
 
 const preferredTags: Record<string, string[]> = {
   EAF: ['EAF.StageCode', 'EAF.HeatNumber', 'EAF.PowerMW', 'EAF.CurrentKA', 'EAF.OxygenFlow', 'EAF.SteelTemperature'],
@@ -78,10 +102,18 @@ function directionLabel(direction: RawPacket['direction']): string {
   return direction === 'PLC_TO_GATEWAY' ? 'PLC → GW' : 'GW → PLC'
 }
 
+function endpoint(node?: SystemNode): string {
+  if (!node) return '—'
+  const address = node.ip ?? node.host ?? '—'
+  return node.port ? `${address}:${node.port}` : address
+}
+
 export function SystemMapTelemetryOverlay() {
   const [targets, setTargets] = useState<HTMLElement[]>([])
   const [valuesByArea, setValuesByArea] = useState<Record<string, HistorianValue[]>>({})
   const [packetSnapshot, setPacketSnapshot] = useState<PacketSnapshot | null>(null)
+  const [nodes, setNodes] = useState<Record<string, SystemNode>>({})
+  const [openId, setOpenId] = useState<string | null>(null)
 
   useEffect(() => {
     const root = document.getElementById('root')
@@ -105,8 +137,9 @@ export function SystemMapTelemetryOverlay() {
 
     const refresh = async () => {
       try {
+        const areas = CONTROLLERS.flatMap((controller) => controller.area ? [controller.area] : [])
         const responses = await Promise.all(
-          CONTROLLERS.map(async ({ area }) => {
+          areas.map(async (area) => {
             const response = await authorizedFetch(`/api/v1/historian/latest?area=${area}`)
             if (!response.ok) return [area, []] as const
             const values = await response.json() as HistorianValue[]
@@ -150,46 +183,106 @@ export function SystemMapTelemetryOverlay() {
     }
   }, [targets.length])
 
+  useEffect(() => {
+    if (targets.length === 0) return
+
+    let cancelled = false
+    let timer: number | null = null
+
+    const refreshNodes = async () => {
+      try {
+        const response = await authorizedFetch('/api/v1/system-map')
+        if (!response.ok) return
+        const payload = await response.json() as SystemMapSnapshot
+        if (!cancelled) setNodes(Object.fromEntries((payload.nodes ?? []).map((node) => [node.id, node])))
+      } finally {
+        if (!cancelled) timer = window.setTimeout(() => { void refreshNodes() }, 3000)
+      }
+    }
+
+    void refreshNodes()
+    return () => {
+      cancelled = true
+      if (timer !== null) window.clearTimeout(timer)
+    }
+  }, [targets.length])
+
+  const toggle = (id: string) => setOpenId((current) => current === id ? null : id)
+
+  const handleKey = (event: KeyboardEvent<HTMLDivElement>, id: string) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault()
+      toggle(id)
+    }
+    if (event.key === 'Escape') setOpenId(null)
+  }
+
+  const keepPopupOpen = (event: MouseEvent<HTMLDivElement>) => event.stopPropagation()
+
   return (
     <>
       {CONTROLLERS.map((controller, index) => {
         const target = targets[index]
         if (!target) return null
-        const values = chooseValues(controller.area, valuesByArea[controller.area] ?? [])
-        const packetController = packetSnapshot?.controllers?.[controller.area]
+        const values = controller.area ? chooseValues(controller.area, valuesByArea[controller.area] ?? []) : []
+        const packetController = packetSnapshot?.controllers?.[controller.packetKey]
         const packets = packetController?.packets ?? []
         const latestPacket = packets[0]
+        const node = nodes[controller.id]
+        const isOpen = openId === controller.id
 
         return createPortal(
-          <div className="system-map-telemetry-anchor" tabIndex={0}>
-            <span>LIVE DATA</span>
-            <div className="system-map-telemetry-popup" role="tooltip">
+          <div
+            className={`system-map-telemetry-anchor ${controller.isReal ? 'real' : ''} ${isOpen ? 'open' : ''}`}
+            tabIndex={0}
+            role="button"
+            aria-expanded={isOpen}
+            aria-label={`Open live diagnostics for ${controller.label}`}
+            onClick={() => toggle(controller.id)}
+            onKeyDown={(event) => handleKey(event, controller.id)}
+          >
+            <span>{controller.isReal ? 'RAW LINK' : 'LIVE DATA'}</span>
+            <div className="system-map-telemetry-popup" role="dialog" aria-label={`${controller.label} diagnostics`} onClick={keepPopupOpen}>
               <header>
-                <small>PLC LIVE TRAFFIC</small>
+                <small>{controller.isReal ? 'REAL PLC DIAGNOSTICS' : 'PLC LIVE TRAFFIC'}</small>
                 <strong>{controller.label}</strong>
                 <span>READ ONLY</span>
               </header>
 
               <div className="system-map-telemetry-grid">
                 <section className="system-map-live-panel">
-                  <div className="system-map-panel-title"><strong>DECODED LIVE VALUES</strong><small>Historian</small></div>
-                  <div className="system-map-telemetry-table">
-                    <div className="system-map-telemetry-head"><span>TAG</span><span>VALUE</span><span>Q</span><span>TIME</span></div>
-                    {values.length > 0 ? values.map((value) => (
-                      <div className="system-map-telemetry-row" key={value.tag_name}>
-                        <code>{value.tag_name}</code>
-                        <strong>{displayValue(value)} {value.engineering_unit ?? ''}</strong>
-                        <span>{value.quality ?? '—'}</span>
-                        <time>{displayTime(value.ts)}</time>
-                      </div>
-                    )) : <div className="system-map-telemetry-empty">Waiting for historian values…</div>}
+                  <div className="system-map-panel-title">
+                    <strong>{controller.isReal ? 'CONNECTION STATUS' : 'DECODED LIVE VALUES'}</strong>
+                    <small>{controller.isReal ? (node?.status ?? 'UNKNOWN').toUpperCase() : 'Historian'}</small>
                   </div>
+
+                  {controller.isReal ? (
+                    <div className="system-map-real-diagnostics">
+                      <div><span>Endpoint</span><code>{endpoint(node)}</code></div>
+                      <div><span>PLC</span><code>{node?.role ?? 'Siemens S7-400H · Rack 0 / Slot 3'}</code></div>
+                      <div><span>Status</span><code>{node?.status?.toUpperCase() ?? 'UNKNOWN'}</code></div>
+                      <div><span>Mode</span><code>READ ONLY</code></div>
+                      <p>{node?.detail ?? 'Waiting for current connection diagnostics.'}</p>
+                    </div>
+                  ) : (
+                    <div className="system-map-telemetry-table">
+                      <div className="system-map-telemetry-head"><span>TAG</span><span>VALUE</span><span>Q</span><span>TIME</span></div>
+                      {values.length > 0 ? values.map((value) => (
+                        <div className="system-map-telemetry-row" key={value.tag_name}>
+                          <code>{value.tag_name}</code>
+                          <strong>{displayValue(value)} {value.engineering_unit ?? ''}</strong>
+                          <span>{value.quality ?? '—'}</span>
+                          <time>{displayTime(value.ts)}</time>
+                        </div>
+                      )) : <div className="system-map-telemetry-empty">Waiting for historian values…</div>}
+                    </div>
+                  )}
                 </section>
 
                 <section className="system-map-raw-panel">
                   <div className="system-map-panel-title">
                     <strong>RAW S7 TRAFFIC</strong>
-                    <small>{packetSnapshot?.available ? 'TCP/102 LIVE' : 'WARMING UP'}</small>
+                    <small>{packets.length > 0 ? 'TCP/102 LIVE' : controller.isReal ? 'STANDBY' : packetSnapshot?.available ? 'WAITING' : 'WARMING UP'}</small>
                   </div>
 
                   <div className="system-map-packet-list">
@@ -199,7 +292,13 @@ export function SystemMapTelemetryOverlay() {
                         <strong>{directionLabel(packet.direction)}</strong>
                         <span>{packet.payload_length} B</span>
                       </div>
-                    )) : <div className="system-map-telemetry-empty">Waiting for TCP/102 packets…</div>}
+                    )) : (
+                      <div className="system-map-telemetry-empty">
+                        {controller.isReal
+                          ? 'No passive S7 frames are being captured yet. The real PLC is currently monitored by a read-only reachability check and is not mapped into the Gateway data path.'
+                          : 'Waiting for TCP/102 packets…'}
+                      </div>
+                    )}
                   </div>
 
                   {latestPacket && (
@@ -217,7 +316,9 @@ export function SystemMapTelemetryOverlay() {
               </div>
 
               <footer>
-                Left: decoded values consumed by Level 2. Right: passive raw TCP/102 capture from the Gateway network namespace.
+                {controller.isReal
+                  ? 'The physical PLC connection is read-only. Raw process frames will appear here after the PLC is intentionally connected to the Gateway with a reviewed DB/tag map.'
+                  : 'Left: decoded values consumed by Level 2. Right: passive raw TCP/102 capture from the Gateway network namespace.'}
               </footer>
             </div>
           </div>,

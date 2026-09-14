@@ -9,13 +9,12 @@ from urllib.request import urlopen
 
 from django.db import connection
 from rest_framework.decorators import api_view
-from rest_framework.exceptions import PermissionDenied
 from rest_framework.request import Request
 from rest_framework.response import Response
 
+from .rbac import require_app_permission
 
 FRESH_AFTER_SECONDS = 5.0
-SYSTEM_MAP_USERNAME = "amiradmin"
 
 
 def _iso(value: Any) -> str | None:
@@ -123,8 +122,7 @@ def _node(
 @api_view(["GET"])
 def live_system_map(request: Request) -> Response:
     """Expose service health and real telemetry movement for the live map page."""
-    if request.user.get_username() != SYSTEM_MAP_USERNAME:
-        raise PermissionDenied("The live system map is restricted to the system administrator.")
+    require_app_permission(request.user, "plc.diagnostics")
 
     controllers = _latest_controller_samples()
     opcua_last_sample = _latest_opcua_sample()

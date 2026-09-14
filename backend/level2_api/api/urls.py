@@ -3,6 +3,9 @@ from __future__ import annotations
 from django.urls import path
 
 from . import views
+from .access_control import roles as access_roles
+from .access_control import user_detail as access_user_detail
+from .access_control import users as access_users
 from .overview_live import overview_live
 from .plc_packets import plc_packets
 from .plc_sources import plc_sources
@@ -11,6 +14,9 @@ from .system_map import live_system_map
 
 urlpatterns = [
     path("auth/me", views.current_user, name="current-user"),
+    path("access/roles", access_roles, name="access-roles"),
+    path("access/users", access_users, name="access-users"),
+    path("access/users/<int:user_id>", access_user_detail, name="access-user-detail"),
     path("meta", views.api_meta, name="api-meta"),
     path("overview-live", overview_live, name="overview-live"),
     path("production-flow", production_flow, name="production-flow"),

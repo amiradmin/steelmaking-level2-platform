@@ -18,6 +18,7 @@ from .production_flow import (
     _latest_nonzero_stage_code,
     _plc_stage_started_at,
 )
+from .rbac import require_app_permission
 from .telemetry import build_dashboard_snapshot
 
 
@@ -292,7 +293,7 @@ def _recent_heats() -> list[dict[str, Any]]:
 @api_view(["GET"])
 def overview_live(request: Request) -> Response:
     """Return only measured or historian-derived values for the Overview page."""
-    del request
+    require_app_permission(request.user, "overview.view")
     snapshot = build_dashboard_snapshot(stale_after_seconds=5.0)
     heat = snapshot.get("active_heat")
     live_values = snapshot.get("live_values") or []

@@ -2,6 +2,9 @@ export type OperatorProfile = {
   username: string
   display_name: string
   is_staff: boolean
+  role: string
+  role_label: string
+  permissions: string[]
 }
 
 type TokenPair = {

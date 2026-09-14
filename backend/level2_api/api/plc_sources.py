@@ -9,6 +9,8 @@ from rest_framework.decorators import api_view
 from rest_framework.request import Request
 from rest_framework.response import Response
 
+from .rbac import require_app_permission
+
 
 def _env_int(name: str, default: int) -> int:
     try:
@@ -50,7 +52,7 @@ def _source(area: str, simulator_host: str) -> dict[str, Any]:
 @api_view(["GET"])
 def plc_sources(request: Request) -> Response:
     """Return configured Level-1 source information without exposing credentials."""
-    del request
+    require_app_permission(request.user, "plc.diagnostics")
     return Response(
         {
             "sources": {

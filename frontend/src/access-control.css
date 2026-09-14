@@ -1,0 +1,33 @@
+.access-page { min-width: 0; }
+.access-heading { align-items: center; }
+.access-policy { min-width: 190px; padding: 10px 12px; display: grid; grid-template-columns: auto 1fr; gap: 2px 9px; border: 1px solid color-mix(in srgb, var(--cyan) 35%, var(--border)); border-radius: 9px; background: var(--cyan-soft); }
+.access-policy > span { grid-row: 1 / 3; align-self: center; padding: 5px 7px; border-radius: 5px; color: var(--cyan); background: color-mix(in srgb, var(--cyan) 12%, transparent); font: 700 9px 'JetBrains Mono', monospace; }
+.access-policy strong { color: var(--text); font-size: 10px; }
+.access-policy small { color: var(--muted); font-size: 8px; }
+.access-message { margin-bottom: 12px; }
+.access-message.success { padding: 10px 13px; border: 1px solid color-mix(in srgb, var(--cyan) 40%, var(--border)); border-radius: 9px; color: var(--cyan); background: var(--cyan-soft); font-size: 10px; }
+.role-grid { margin-bottom: 12px; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 9px; }
+.role-card { min-width: 0; padding: 13px; border: 1px solid var(--border); border-top: 2px solid var(--primary); border-radius: 10px; background: var(--surface); box-shadow: var(--shadow); }
+.role-card > div { display: flex; flex-direction: column; gap: 3px; }
+.role-card > div span { color: var(--primary); font: 700 7px 'JetBrains Mono', monospace; letter-spacing: .08em; }
+.role-card > div strong { font-size: 11px; }
+.role-card > small { display: block; margin-top: 5px; color: var(--muted); font-size: 8px; }
+.role-card ul { margin: 10px 0 0; padding: 0; display: grid; gap: 5px; list-style: none; }
+.role-card li { padding-left: 10px; position: relative; color: var(--text-2); font-size: 8px; line-height: 1.35; }
+.role-card li::before { content: ''; width: 4px; height: 4px; position: absolute; top: 4px; left: 0; border-radius: 50%; background: var(--cyan); }
+.access-layout { display: grid; grid-template-columns: minmax(0, 1fr) 310px; gap: 12px; }
+.access-count { padding: 4px 7px; border: 1px solid var(--border); border-radius: 5px; color: var(--muted); font: 700 8px 'JetBrains Mono', monospace; }
+.access-table-wrap { overflow-x: auto; }
+.access-table { min-width: 690px; }
+.access-table td:first-child strong, .access-table td:first-child small { display: block; }
+.access-table td:first-child small { margin-top: 3px; color: var(--muted); font: 500 8px 'JetBrains Mono', monospace; }
+.access-table select, .create-user-panel input, .create-user-panel select { width: 100%; height: 36px; padding: 0 9px; border: 1px solid var(--border); border-radius: 7px; outline: 0; color: var(--text); background: var(--surface-2); font-size: 9px; }
+.access-table select:focus, .create-user-panel input:focus, .create-user-panel select:focus { border-color: var(--primary); box-shadow: 0 0 0 2px var(--primary-soft); }
+.access-toggle { display: inline-flex; align-items: center; gap: 7px; color: var(--text-2); font-size: 9px; cursor: pointer; }
+.access-toggle input { accent-color: var(--cyan); }
+.access-loading { padding: 18px; color: var(--muted); text-align: center; font-size: 9px; }
+.create-user-panel form { padding: 16px; display: grid; gap: 13px; }
+.create-user-panel label { display: grid; gap: 6px; color: var(--text-2); font-size: 9px; font-weight: 600; }
+.create-user-panel .login-button { margin-top: 2px; }
+@media (max-width: 1200px) { .role-grid { grid-template-columns: repeat(3, 1fr); } .access-layout { grid-template-columns: 1fr; } }
+@media (max-width: 720px) { .role-grid { grid-template-columns: 1fr; } .access-policy { width: 100%; } }

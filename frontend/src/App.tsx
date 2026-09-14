@@ -3,10 +3,25 @@ import { AuthenticationExpiredError, OperatorProfile, authorizedFetch, clearToke
 import { TelemetryConnectionStatus, subscribeRealtimeTelemetry } from './telemetry'
 import { LiveSystemMap } from './SystemMap'
 import { LiveProductionFlow } from './ProductionFlow'
+import { AccessControl } from './AccessControl'
+import { OverviewLiveOverlay } from './OverviewLiveOverlay'
+import { PlcSourceOverlay } from './PlcSourceOverlay'
+import { SystemMapTelemetryOverlay } from './SystemMapTelemetryOverlay'
 
 type Theme = 'dark' | 'light'
 type View = 'login' | 'dashboard'
-type DashboardPage = 'overview' | 'production-flow' | 'system-map'
+type DashboardPage = 'overview' | 'production-flow' | 'system-map' | 'access-control'
+
+const dashboardPages: DashboardPage[] = ['overview', 'production-flow', 'system-map', 'access-control']
+
+function pageFromHash(): DashboardPage {
+  const value = window.location.hash.replace(/^#\/?/, '')
+  return dashboardPages.includes(value as DashboardPage) ? value as DashboardPage : 'overview'
+}
+
+function pageHash(page: DashboardPage): string {
+  return `#/${page}`
+}
 
 type Heat = {
   heat_no: string
@@ -94,19 +109,19 @@ const demoHeats: Heat[] = [
   { heat_no: 'H-4079', status: 'COMPLETED', grade_code: '1008-ASTM', planned_weight_t: 170, actual_weight_t: 168.8 },
 ]
 
-const navItems: Array<{ icon: IconName; label: string; badge?: string; enabled?: boolean }> = [
-  { icon: 'dashboard', label: 'Overview' },
-  { icon: 'heat', label: 'Heat Tracking', badge: 'H-4082' },
-  { icon: 'bolt', label: 'Electric Arc Furnace (EAF)' },
-  { icon: 'ladle', label: 'Ladle Furnace (LF)' },
-  { icon: 'cast', label: 'Continuous Casting (CCM)' },
-  { icon: 'inventory', label: 'Raw Materials & Charging' },
-  { icon: 'history', label: 'Data Historian' },
-  { icon: 'chart', label: 'Reports & Analytics', enabled: false },
-  { icon: 'alarm', label: 'Alarm Management', badge: '3' },
-  { icon: 'heat', label: 'Live Production Flow' },
-  { icon: 'link', label: 'Live System Map' },
-  { icon: 'settings', label: 'System Settings', enabled: false },
+const navItems: Array<{ icon: IconName; label: string; permission: string; page?: DashboardPage; badge?: string; enabled?: boolean }> = [
+  { icon: 'dashboard', label: 'Overview', permission: 'overview.view', page: 'overview' },
+  { icon: 'heat', label: 'Heat Tracking', permission: 'production.view', badge: 'H-4082' },
+  { icon: 'bolt', label: 'Electric Arc Furnace (EAF)', permission: 'production.view' },
+  { icon: 'ladle', label: 'Ladle Furnace (LF)', permission: 'production.view' },
+  { icon: 'cast', label: 'Continuous Casting (CCM)', permission: 'production.view' },
+  { icon: 'inventory', label: 'Raw Materials & Charging', permission: 'production.view' },
+  { icon: 'history', label: 'Data Historian', permission: 'historian.view' },
+  { icon: 'chart', label: 'Reports & Analytics', permission: 'reports.view', enabled: false },
+  { icon: 'alarm', label: 'Alarm Management', permission: 'alarms.view', badge: '3' },
+  { icon: 'heat', label: 'Live Production Flow', permission: 'production.view', page: 'production-flow' },
+  { icon: 'link', label: 'Live System Map', permission: 'plc.diagnostics', page: 'system-map' },
+  { icon: 'settings', label: 'Access Control', permission: 'users.manage', page: 'access-control' },
 ]
 
 function getInitialTheme(): Theme {
@@ -275,7 +290,35 @@ function Dashboard({ theme, onThemeChange, onLogout, initialOperator }: { theme:
   const [l1LinkOnline, setL1LinkOnline] = useState(false)
   const [l1AgeSeconds, setL1AgeSeconds] = useState<number | null>(null)
   const [lastTelemetryAt, setLastTelemetryAt] = useState<string | null>(null)
-  const [dashboardPage, setDashboardPage] = useState<DashboardPage>('overview')
+  const [dashboardPage, setDashboardPage] = useState<DashboardPage>(pageFromHash)
+
+  useEffect(() => {
+    const syncPageFromUrl = () => setDashboardPage(pageFromHash())
+    const normalizedHash = pageHash(pageFromHash())
+    if (window.location.hash !== normalizedHash) {
+      window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}${normalizedHash}`)
+    }
+    window.addEventListener('hashchange', syncPageFromUrl)
+    return () => window.removeEventListener('hashchange', syncPageFromUrl)
+  }, [])
+
+  useEffect(() => {
+    if (!operator) return
+    const route = navItems.find((item) => item.page === dashboardPage)
+    if (route && (route.enabled === false || !operator.permissions.includes(route.permission))) {
+      window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}${pageHash('overview')}`)
+      setDashboardPage('overview')
+    }
+  }, [dashboardPage, operator])
+
+  const navigateToPage = (page: DashboardPage) => {
+    setSidebarOpen(false)
+    if (window.location.hash === pageHash(page)) {
+      setDashboardPage(page)
+      return
+    }
+    window.location.hash = pageHash(page)
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -363,8 +406,7 @@ function Dashboard({ theme, onThemeChange, onLogout, initialOperator }: { theme:
   const castingSpeed = valueFor('CCM.CastingSpeed')
   const criticalAlarmCount = alarms.filter((alarm) => ['CRITICAL', 'HIGH'].includes(alarm.severity.toUpperCase())).length
   const realtimeHealthy = telemetryStatus === 'live' && l1LinkOnline
-  const hasSystemMapAccess = operator?.username === 'amiradmin'
-  const visibleNavItems = navItems.filter((item) => item.label !== 'Live System Map' || hasSystemMapAccess)
+  const hasPermission = (permission: string) => operator?.permissions?.includes(permission) ?? false
 
   return (
     <div className="dashboard-shell">
@@ -372,12 +414,12 @@ function Dashboard({ theme, onThemeChange, onLogout, initialOperator }: { theme:
         <div className="sidebar-brand"><Brand /></div>
         <div className="link-health"><span className={`status-dot ${realtimeHealthy ? 'online' : 'warning'}`} /><span><strong>{realtimeHealthy ? 'L1 / L2 LINK: ACTIVE' : 'L1 / L2 LINK: DEGRADED'}</strong><small>{l1AgeSeconds === null ? 'NO RECENT SAMPLE' : `${formatMetric(l1AgeSeconds, 1)} s · REALTIME`}</small></span></div>
         <nav className="side-nav" aria-label="System navigation">
-          {visibleNavItems.map((item, index) => {
-            const enabled = item.enabled !== false
-            const isSystemMap = item.label === 'Live System Map'
-            const isProductionFlow = item.label === 'Live Production Flow'
-            const active = isSystemMap ? dashboardPage === 'system-map' : isProductionFlow ? dashboardPage === 'production-flow' : index === 0 && dashboardPage === 'overview'
-            return <button className={active ? 'active' : ''} type="button" key={item.label} disabled={!enabled} aria-disabled={!enabled} title={enabled ? undefined : 'Available after server delivery'} onClick={() => { if (isSystemMap) setDashboardPage('system-map'); else if (isProductionFlow) setDashboardPage('production-flow'); else if (index === 0) setDashboardPage('overview') }}><Icon name={item.icon} /><span>{item.label}</span>{item.badge && <em>{item.badge}</em>}</button>
+          {navItems.map((item) => {
+            const permitted = hasPermission(item.permission)
+            const enabled = item.enabled !== false && permitted
+            const active = item.page === dashboardPage
+            const unavailableReason = item.enabled === false ? 'Available after server delivery' : 'Not permitted for your role'
+            return <button className={active ? 'active' : ''} type="button" key={item.label} disabled={!enabled} aria-disabled={!enabled} title={enabled ? undefined : unavailableReason} onClick={() => { if (item.page) navigateToPage(item.page) }}><Icon name={item.icon} /><span>{item.label}</span>{item.badge && <em>{item.badge}</em>}</button>
           })}
         </nav>
         <div className="sidebar-footer"><button type="button"><Icon name="settings" /> Shift Technical Support</button><button type="button" onClick={onLogout}><Icon name="logout" /> Sign Out</button></div>
@@ -396,12 +438,14 @@ function Dashboard({ theme, onThemeChange, onLogout, initialOperator }: { theme:
             <label className="search-box"><Icon name="search" /><input placeholder="Search heat, grade, or ladle..." /></label>
             <ThemeToggle theme={theme} onChange={onThemeChange} />
             <button className="icon-button notification-button" type="button" aria-label="Notifications"><Icon name="bell" /><i>{alarms.length}</i></button>
-            <div className="operator"><span><strong>{operator?.username ?? operator?.display_name ?? 'Level 2 Operator'}</strong><small>Authenticated User</small></span><span className="operator-avatar"><Icon name="user" /></span></div>
+            <div className="operator"><span><strong>{operator?.username ?? operator?.display_name ?? 'Level 2 Operator'}</strong><small>{operator?.role_label ?? 'Authenticated User'}</small></span><span className="operator-avatar"><Icon name="user" /></span></div>
           </div>
         </header>
 
         <div className="dashboard-content">
-          {dashboardPage === 'production-flow' ? <LiveProductionFlow /> : dashboardPage === 'system-map' && hasSystemMapAccess ? <LiveSystemMap telemetryStatus={telemetryStatus} /> : <>
+          {dashboardPage === 'production-flow' && hasPermission('production.view') ? <LiveProductionFlow />
+            : dashboardPage === 'system-map' && hasPermission('plc.diagnostics') ? <LiveSystemMap telemetryStatus={telemetryStatus} />
+              : dashboardPage === 'access-control' && hasPermission('users.manage') ? <AccessControl currentUsername={operator?.username ?? ''} /> : <>
           <div className="page-heading">
             <div><span className="section-kicker">LEVEL 2 OPERATIONS</span><h1>Steelmaking Operations Overview</h1><p>Integrated production monitoring from the electric arc furnace to continuous casting</p></div>
             <div className="update-state"><span className={`status-dot ${error || !realtimeHealthy ? 'warning' : 'online'}`} /><span><strong>{error ? 'Demo Data Mode' : realtimeHealthy ? 'Synced with Level 1' : 'Realtime Link Degraded'}</strong><small>Last updated: {formatClock(lastTelemetryAt)}</small></span></div>
@@ -462,6 +506,9 @@ function Dashboard({ theme, onThemeChange, onLogout, initialOperator }: { theme:
           </>}
         </div>
       </main>
+      {hasPermission('overview.view') && <OverviewLiveOverlay />}
+      {hasPermission('plc.diagnostics') && <PlcSourceOverlay />}
+      {dashboardPage === 'system-map' && hasPermission('plc.diagnostics') && <SystemMapTelemetryOverlay />}
     </div>
   )
 }

@@ -12,6 +12,7 @@ from rest_framework.decorators import api_view
 from rest_framework.request import Request
 from rest_framework.response import Response
 
+from .rbac import require_app_permission
 from .telemetry import build_dashboard_snapshot
 
 
@@ -266,7 +267,7 @@ def _current_activity(*, definition: dict[str, Any], active_stage: dict[str, Any
 @api_view(["GET"])
 def production_flow(request: Request) -> Response:
     """Expose the operator-safe, real-time EAF-to-CCM production flow."""
-    del request
+    require_app_permission(request.user, "production.view")
     snapshot = build_dashboard_snapshot(stale_after_seconds=5.0)
     heat = snapshot["active_heat"]
     live_values = snapshot["live_values"]

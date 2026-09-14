@@ -6,12 +6,11 @@ from pathlib import Path
 from typing import Any
 
 from rest_framework.decorators import api_view
-from rest_framework.exceptions import PermissionDenied
 from rest_framework.request import Request
 from rest_framework.response import Response
 
+from .rbac import require_app_permission
 
-SYSTEM_MAP_USERNAME = "amiradmin"
 CAPTURE_PATH = Path(os.getenv("PLC_PACKET_CAPTURE_PATH", "/capture/plc_packets.json"))
 
 
@@ -25,8 +24,7 @@ def _limit(request: Request) -> int:
 @api_view(["GET"])
 def plc_packets(request: Request) -> Response:
     """Return a small read-only window of recent TCP/102 packets for diagnostics."""
-    if request.user.get_username() != SYSTEM_MAP_USERNAME:
-        raise PermissionDenied("Raw PLC traffic is restricted to the system administrator.")
+    require_app_permission(request.user, "plc.diagnostics")
 
     limit = _limit(request)
     try:

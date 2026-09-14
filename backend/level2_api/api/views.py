@@ -12,6 +12,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 
 from . import repositories
+from .rbac import ROLE_LABELS, permissions_for_user, require_app_permission, role_for_user
 
 
 def _limit(request: Request, *, default: int, maximum: int) -> int:
@@ -87,11 +88,15 @@ def health(request: Request) -> Response:
 def current_user(request: Request) -> Response:
     user = request.user
     display_name = user.get_full_name().strip() or user.get_username()
+    role = role_for_user(user)
     return Response(
         {
             "username": user.get_username(),
             "display_name": display_name,
             "is_staff": user.is_staff,
+            "role": role,
+            "role_label": ROLE_LABELS[role],
+            "permissions": sorted(permissions_for_user(user)),
         }
     )
 
@@ -125,6 +130,7 @@ def api_meta(request: Request) -> Response:
 
 @api_view(["GET"])
 def list_heats(request: Request) -> Response:
+    require_app_permission(request.user, "production.view")
     return Response(
         repositories.heats(
             status=request.query_params.get("status"),
@@ -135,13 +141,13 @@ def list_heats(request: Request) -> Response:
 
 @api_view(["GET"])
 def heat_detail(request: Request, heat_no: str) -> Response:
-    del request
+    require_app_permission(request.user, "production.view")
     return Response(_heat_or_404(heat_no))
 
 
 @api_view(["GET"])
 def heat_overview(request: Request, heat_no: str) -> Response:
-    del request
+    require_app_permission(request.user, "production.view")
     heat = _heat_or_404(heat_no)
     heat_id = heat["id"]
     return Response(
@@ -157,11 +163,13 @@ def heat_overview(request: Request, heat_no: str) -> Response:
 
 @api_view(["GET"])
 def equipment(request: Request) -> Response:
+    require_app_permission(request.user, "production.view")
     return Response(repositories.equipment(area=request.query_params.get("area")))
 
 
 @api_view(["GET"])
 def steel_grades(request: Request) -> Response:
+    require_app_permission(request.user, "production.view")
     return Response(
         repositories.steel_grades(
             active_only=_bool_query(request, "active_only", default=True)
@@ -171,6 +179,7 @@ def steel_grades(request: Request) -> Response:
 
 @api_view(["GET"])
 def events(request: Request) -> Response:
+    require_app_permission(request.user, "historian.view")
     return Response(
         repositories.events(
             heat_no=request.query_params.get("heat_no"),
@@ -183,6 +192,7 @@ def events(request: Request) -> Response:
 
 @api_view(["GET"])
 def alarms(request: Request) -> Response:
+    require_app_permission(request.user, "alarms.view")
     return Response(
         repositories.alarms(
             state=request.query_params.get("state"),
@@ -195,6 +205,7 @@ def alarms(request: Request) -> Response:
 
 @api_view(["GET"])
 def historian_latest(request: Request) -> Response:
+    require_app_permission(request.user, "historian.view")
     return Response(
         repositories.historian_latest(
             area=request.query_params.get("area"),
@@ -206,6 +217,7 @@ def historian_latest(request: Request) -> Response:
 
 @api_view(["GET"])
 def historian_tag_samples(request: Request, tag_name: str) -> Response:
+    require_app_permission(request.user, "historian.view")
     tag = repositories.historian_tag(tag_name)
     if tag is None:
         raise NotFound(detail=f"Tag {tag_name} not found")

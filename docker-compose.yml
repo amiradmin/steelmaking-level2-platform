@@ -154,6 +154,7 @@ services:
       dockerfile: opcua_gateway/Dockerfile
     container_name: steelmaking-level2-central-opcua
     restart: unless-stopped
+    command: ["sh", "-c", "python packet_monitor.py & exec python gateway.py"]
     depends_on:
       eaf-plc-simulator:
         condition: service_started
@@ -177,8 +178,12 @@ services:
       OPCUA_GATEWAY_POLL_SECONDS: ${OPCUA_GATEWAY_POLL_SECONDS:-0.5}
       OPCUA_GATEWAY_RECONNECT_SECONDS: ${OPCUA_GATEWAY_RECONNECT_SECONDS:-2}
       OPCUA_GATEWAY_REQUIRE_ALL_PLC: "1"
+      PLC_PACKET_CAPTURE_PATH: /capture/plc_packets.json
+      PLC_PACKET_RING_SIZE: ${PLC_PACKET_RING_SIZE:-30}
     ports:
       - "${CENTRAL_OPCUA_PORT:-4845}:4840"
+    volumes:
+      - plc_packet_capture:/capture
     networks:
       - level2-net
 
@@ -282,8 +287,12 @@ services:
       DJANGO_BOOTSTRAP_USERNAME: ${DJANGO_BOOTSTRAP_USERNAME:-OP-4109}
       DJANGO_BOOTSTRAP_PASSWORD: ${DJANGO_BOOTSTRAP_PASSWORD:-Level2Demo-1405}
       DJANGO_BOOTSTRAP_DISPLAY_NAME: ${DJANGO_BOOTSTRAP_DISPLAY_NAME:-Shift Operator}
+      DJANGO_BOOTSTRAP_ROLE: ${DJANGO_BOOTSTRAP_ROLE:-ADMINISTRATOR}
+      PLC_PACKET_CAPTURE_PATH: /capture/plc_packets.json
     ports:
       - "${LEVEL2_API_PORT:-8080}:8080"
+    volumes:
+      - plc_packet_capture:/capture:ro
     healthcheck:
       test:
         - CMD
@@ -354,6 +363,7 @@ services:
 
 volumes:
   historian_data:
+  plc_packet_capture:
 
 networks:
   level2-net:

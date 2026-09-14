@@ -44,7 +44,7 @@ def plc_packets(request: Request) -> Response:
         controllers = {}
 
     trimmed: dict[str, Any] = {}
-    for name in ("EAF", "LF", "CCM"):
+    for name in ("EAF", "LF", "CCM", "REAL"):
         entry = controllers.get(name)
         if not isinstance(entry, dict):
             continue

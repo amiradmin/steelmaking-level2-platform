@@ -12,6 +12,7 @@ from typing import Any
 
 CAPTURE_PATH = Path(os.getenv("PLC_PACKET_CAPTURE_PATH", "/capture/plc_packets.json"))
 RING_SIZE = max(5, min(100, int(os.getenv("PLC_PACKET_RING_SIZE", "30"))))
+CAPTURE_INTERFACE = os.getenv("PLC_PACKET_INTERFACE", "eth0").strip() or "eth0"
 
 CONTROLLERS = {
     "EAF": os.getenv("EAF_PLC_HOST", "eaf-plc-simulator").strip() or "eaf-plc-simulator",
@@ -49,6 +50,7 @@ def persist(packets: dict[str, deque[dict[str, Any]]], resolved: dict[str, str])
     payload = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "capture_mode": "PASSIVE_TCPDUMP_TCP_102",
+        "interface": CAPTURE_INTERFACE,
         "controllers": {
             name: {
                 "host": CONTROLLERS[name],
@@ -74,7 +76,7 @@ def main() -> None:
         [
             "tcpdump",
             "-i",
-            "any",
+            CAPTURE_INTERFACE,
             "-nn",
             "-tttt",
             "-s",

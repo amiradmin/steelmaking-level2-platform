@@ -142,7 +142,7 @@ async def write_datavalue(node: Any, value: Any, status: int) -> None:
     await node.write_value(
         ua.DataValue(
             ua.Variant(value),
-            StatusCode=ua.StatusCode(status),
+            ua.StatusCode(status),
             SourceTimestamp=now,
             ServerTimestamp=now,
         )

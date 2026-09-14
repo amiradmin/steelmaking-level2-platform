@@ -7,6 +7,7 @@ import { HeatTracking } from './HeatTracking'
 import { EafDashboard } from './EafDashboard'
 import { LfDashboard } from './LfDashboard'
 import { CcmDashboard } from './CcmDashboard'
+import { RawMaterials } from './RawMaterials'
 import { DataHistorian } from './DataHistorian'
 import { AlarmManagement } from './AlarmManagement'
 import { AccessControl } from './AccessControl'
@@ -16,9 +17,9 @@ import { SystemMapTelemetryOverlay } from './SystemMapTelemetryOverlay'
 
 type Theme = 'dark' | 'light'
 type View = 'login' | 'dashboard'
-type DashboardPage = 'overview' | 'heat-tracking' | 'eaf' | 'lf' | 'ccm' | 'historian' | 'alarms' | 'production-flow' | 'system-map' | 'access-control'
+type DashboardPage = 'overview' | 'heat-tracking' | 'eaf' | 'lf' | 'ccm' | 'materials' | 'historian' | 'alarms' | 'production-flow' | 'system-map' | 'access-control'
 
-const dashboardPages: DashboardPage[] = ['overview', 'heat-tracking', 'eaf', 'lf', 'ccm', 'historian', 'alarms', 'production-flow', 'system-map', 'access-control']
+const dashboardPages: DashboardPage[] = ['overview', 'heat-tracking', 'eaf', 'lf', 'ccm', 'materials', 'historian', 'alarms', 'production-flow', 'system-map', 'access-control']
 
 function pageFromHash(): DashboardPage {
   const value = window.location.hash.replace(/^#\/?/, '')
@@ -88,7 +89,7 @@ const iconPaths: Record<IconName, ReactNode> = {
   chart: <><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></>,
   alarm: <><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10 21h4"/></>,
   link: <><path d="M10 13a5 5 0 0 0 7.1.1l2-2a5 5 0 0 0-7.1-7.1l-1.1 1.1"/><path d="M14 11a5 5 0 0 0-7.1-.1l-2 2A5 5 0 0 0 12 20l1.1-1.1"/></>,
-  settings: <><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.2h-4V21a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1L4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9A1.7 1.7 0 0 0 3 14H2.8v-4H3a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9L4.2 7 7 4.2l.1.1A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-1.6v-.2h4V3a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.2v4H21a1.7 1.7 0 0 0-1.6 1Z"/></>,
+  settings: <><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.2h-4V21a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1L4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9A1.7 1.7 0 0 0 3 14H2.8v-4H3a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9L4.2 7 7 4.2l.1.1A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-1.6v-.2h4V3a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.2v4H21a1.7 1.7 0 0 0-1.6 1Z"/>,
   search: <><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></>,
   bell: <><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></>,
   sun: <><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></>,
@@ -121,7 +122,7 @@ const navItems: Array<{ icon: IconName; label: string; permission: string; page?
   { icon: 'bolt', label: 'Electric Arc Furnace (EAF)', permission: 'production.view', page: 'eaf' },
   { icon: 'ladle', label: 'Ladle Furnace (LF)', permission: 'production.view', page: 'lf' },
   { icon: 'cast', label: 'Continuous Casting (CCM)', permission: 'production.view', page: 'ccm' },
-  { icon: 'inventory', label: 'Raw Materials & Charging', permission: 'production.view' },
+  { icon: 'inventory', label: 'Raw Materials & Charging', permission: 'production.view', page: 'materials' },
   { icon: 'history', label: 'Data Historian', permission: 'historian.view', page: 'historian' },
   { icon: 'chart', label: 'Reports & Analytics', permission: 'reports.view', enabled: false },
   { icon: 'alarm', label: 'Alarm Management', permission: 'alarms.view', page: 'alarms' },
@@ -453,11 +454,12 @@ function Dashboard({ theme, onThemeChange, onLogout, initialOperator }: { theme:
             : dashboardPage === 'eaf' && hasPermission('production.view') ? <EafDashboard />
               : dashboardPage === 'lf' && hasPermission('production.view') ? <LfDashboard />
                 : dashboardPage === 'ccm' && hasPermission('production.view') ? <CcmDashboard />
-                  : dashboardPage === 'historian' && hasPermission('historian.view') ? <DataHistorian />
-                    : dashboardPage === 'alarms' && hasPermission('alarms.view') ? <AlarmManagement />
-                      : dashboardPage === 'production-flow' && hasPermission('production.view') ? <LiveProductionFlow />
-                        : dashboardPage === 'system-map' && hasPermission('plc.diagnostics') ? <LiveSystemMap telemetryStatus={telemetryStatus} />
-                          : dashboardPage === 'access-control' && hasPermission('users.manage') ? <AccessControl currentUsername={operator?.username ?? ''} /> : <>
+                  : dashboardPage === 'materials' && hasPermission('production.view') ? <RawMaterials />
+                    : dashboardPage === 'historian' && hasPermission('historian.view') ? <DataHistorian />
+                      : dashboardPage === 'alarms' && hasPermission('alarms.view') ? <AlarmManagement />
+                        : dashboardPage === 'production-flow' && hasPermission('production.view') ? <LiveProductionFlow />
+                          : dashboardPage === 'system-map' && hasPermission('plc.diagnostics') ? <LiveSystemMap telemetryStatus={telemetryStatus} />
+                            : dashboardPage === 'access-control' && hasPermission('users.manage') ? <AccessControl currentUsername={operator?.username ?? ''} /> : <>
           <div className="page-heading">
             <div><span className="section-kicker">LEVEL 2 OPERATIONS</span><h1>Steelmaking Operations Overview</h1><p>Integrated production monitoring from the electric arc furnace to continuous casting</p></div>
             <div className="update-state"><span className={`status-dot ${error || !realtimeHealthy ? 'warning' : 'online'}`} /><span><strong>{error ? 'Demo Data Mode' : realtimeHealthy ? 'Synced with Level 1' : 'Realtime Link Degraded'}</strong><small>Last updated: {formatClock(lastTelemetryAt)}</small></span></div>

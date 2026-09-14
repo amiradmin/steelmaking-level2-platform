@@ -6,6 +6,7 @@ from . import views
 from .access_control import roles as access_roles
 from .access_control import user_detail as access_user_detail
 from .access_control import users as access_users
+from .heat_timeline import heat_timeline
 from .overview_live import overview_live
 from .plc_packets import plc_packets
 from .plc_sources import plc_sources
@@ -26,6 +27,7 @@ urlpatterns = [
     path("heats", views.list_heats, name="heat-list"),
     path("heats/<str:heat_no>", views.heat_detail, name="heat-detail"),
     path("heats/<str:heat_no>/overview", views.heat_overview, name="heat-overview"),
+    path("heats/<str:heat_no>/timeline", heat_timeline, name="heat-timeline"),
     path("equipment", views.equipment, name="equipment"),
     path("steel-grades", views.steel_grades, name="steel-grades"),
     path("events", views.events, name="events"),

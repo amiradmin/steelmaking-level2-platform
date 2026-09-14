@@ -1,0 +1,31 @@
+services:
+  plc-packet-monitor:
+    profiles:
+      - plc-multi-test
+    image: steelmaking-level2-platform-central-opcua:latest
+    container_name: steelmaking-level2-plc-packet-monitor
+    restart: unless-stopped
+    network_mode: "service:central-opcua-server"
+    depends_on:
+      central-opcua-server:
+        condition: service_started
+    command: ["python", "packet_monitor.py"]
+    healthcheck:
+      disable: true
+    environment:
+      EAF_PLC_HOST: ${EAF_PLC_HOST:-eaf-plc-simulator}
+      LF_PLC_HOST: ${LF_PLC_HOST:-lf-plc-simulator}
+      CCM_PLC_HOST: ${CCM_PLC_HOST:-ccm-plc-simulator}
+      PLC_PACKET_CAPTURE_PATH: /capture/plc_packets.json
+      PLC_PACKET_RING_SIZE: ${PLC_PACKET_RING_SIZE:-30}
+    volumes:
+      - plc_packet_capture:/capture
+
+  level2-api:
+    environment:
+      PLC_PACKET_CAPTURE_PATH: /capture/plc_packets.json
+    volumes:
+      - plc_packet_capture:/capture:ro
+
+volumes:
+  plc_packet_capture:

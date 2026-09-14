@@ -21,9 +21,11 @@ CONTROLLERS = {
 
 HEADER_RE = re.compile(
     r"^(?P<date>\d{4}-\d{2}-\d{2}) (?P<time>\d{2}:\d{2}:\d{2}\.\d+) "
-    r"IP (?P<src>\d+\.\d+\.\d+\.\d+)\.(?P<src_port>\d+) > "
-    r"(?P<dst>\d+\.\d+\.\d+\.\d+)\.(?P<dst_port>\d+):.*(?:length (?P<length>\d+))?"
+    r"(?:(?:\S+)\s+(?:In|Out)\s+)?IP "
+    r"(?P<src>\d+\.\d+\.\d+\.\d+)\.(?P<src_port>\d+) > "
+    r"(?P<dst>\d+\.\d+\.\d+\.\d+)\.(?P<dst_port>\d+):"
 )
+LENGTH_RE = re.compile(r"\blength (?P<length>\d+)\b")
 HEX_RE = re.compile(r"^\s*0x[0-9a-fA-F]+:\s+(?P<hex>(?:[0-9a-fA-F]{4}\s*)+)")
 
 
@@ -123,13 +125,14 @@ def main() -> None:
         header = HEADER_RE.match(line)
         if header:
             finish_packet()
+            length_match = LENGTH_RE.search(line)
             current = {
                 "captured_at": f"{header.group('date')}T{header.group('time')}Z",
                 "src_ip": header.group("src"),
                 "src_port": int(header.group("src_port")),
                 "dst_ip": header.group("dst"),
                 "dst_port": int(header.group("dst_port")),
-                "payload_length": int(header.group("length") or 0),
+                "payload_length": int(length_match.group("length")) if length_match else 0,
             }
             continue
         hex_match = HEX_RE.match(line)

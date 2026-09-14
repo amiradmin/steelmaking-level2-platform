@@ -18,8 +18,13 @@ function findMaterialsButton(): HTMLButtonElement | null {
 
 function setMaterialsQuery(enabled: boolean): void {
   const url = new URL(window.location.href)
-  if (enabled) url.searchParams.set(MATERIALS_QUERY_KEY, MATERIALS_QUERY_VALUE)
-  else url.searchParams.delete(MATERIALS_QUERY_KEY)
+  if (enabled) {
+    url.searchParams.set(MATERIALS_QUERY_KEY, MATERIALS_QUERY_VALUE)
+  } else if (url.searchParams.get(MATERIALS_QUERY_KEY) === MATERIALS_QUERY_VALUE) {
+    url.searchParams.delete(MATERIALS_QUERY_KEY)
+  } else {
+    return
+  }
   window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`)
 }
 

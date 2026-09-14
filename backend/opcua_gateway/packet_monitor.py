@@ -100,6 +100,11 @@ def main() -> None:
         nonlocal current, hex_words, sequence, resolved
         if current is None:
             return
+        if int(current.get("payload_length", 0)) <= 0:
+            current = None
+            hex_words = []
+            return
+
         resolved = resolve_hosts()
         controller = next(
             (

@@ -339,7 +339,7 @@ services:
       test:
         - CMD
         - wget
-        -q
+        - -q
         - -O
         - /dev/null
         - http://127.0.0.1/frontend-health

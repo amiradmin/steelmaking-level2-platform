@@ -24,6 +24,12 @@ def _dictfetchall(cursor: Any) -> list[dict[str, Any]]:
 
 
 def _latest_real_values(area: str) -> list[dict[str, Any]]:
+    """Return the latest GOOD physical sample for each tag in one process area.
+
+    When the S7 link drops, the gateway may keep publishing cached OPC UA values
+    with BadNoCommunication quality. Those values are useful diagnostically but
+    must never be presented as verified live plant process data.
+    """
     with connection.cursor() as cursor:
         cursor.execute(
             """
@@ -49,6 +55,7 @@ def _latest_real_values(area: str) -> list[dict[str, Any]]:
             WHERE pt.is_active = TRUE
               AND e.area = %s
               AND ps.attributes->>'source_kind' = %s
+              AND ps.quality = 'GOOD'
             ORDER BY ps.tag_id, ps.ts DESC
             """,
             [area, REAL_SOURCE_KIND],
@@ -58,7 +65,7 @@ def _latest_real_values(area: str) -> list[dict[str, Any]]:
 
 @api_view(["GET"])
 def real_plc_latest(request: Request) -> Response:
-    """Return only historian samples explicitly verified as physical S7 reads."""
+    """Return only historian samples verified by successful physical S7 reads."""
     require_app_permission(request.user, "historian.view")
 
     area = (request.query_params.get("area") or "EAF").strip().upper()

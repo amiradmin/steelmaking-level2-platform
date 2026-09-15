@@ -2,6 +2,7 @@ import { KeyboardEvent, MouseEvent, useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { authorizedFetch } from './auth'
 import './system-map-telemetry-overlay.css'
+import './system-map-real-plc.css'
 
 type HistorianValue = {
   tag_name: string
@@ -10,6 +11,22 @@ type HistorianValue = {
   value_text?: string | null
   quality?: string | null
   ts?: string | null
+  heat_no?: string | null
+  source_kind?: string | null
+  source_endpoint?: string | null
+  node_id?: string | null
+}
+
+type RealPlcSnapshot = {
+  area: string
+  source_kind: string
+  verified: boolean
+  fresh: boolean
+  stale_after_seconds: number
+  age_seconds?: number | null
+  latest_sample_at?: string | null
+  source_endpoint?: string | null
+  values: HistorianValue[]
 }
 
 type RawPacket = {
@@ -79,11 +96,70 @@ const preferredTags: Record<string, string[]> = {
   CCM: ['CCM.StageCode', 'CCM.HeatNumber', 'CCM.CastingSpeed', 'CCM.TundishTemperature', 'CCM.MoldLevelPercent', 'CCM.TundishWeightTon'],
 }
 
+const realPreferredTags = [
+  'EAF.HeatNumber',
+  'EAF.StageCode',
+  'EAF.SteelTemperature',
+  'EAF.PowerMW',
+  'EAF.CurrentKA',
+  'EAF.OxygenFlow',
+  'EAF.TransformerTap',
+  'EAF.Ready',
+  'EAF.Running',
+  'EAF.Fault',
+  'EAF.ArcOn',
+  'EAF.OxygenOn',
+  'EAF.BurnerOn',
+  'EAF.InterlockOK',
+  'EAF.CoolingWaterOK',
+  'EAF.HydraulicOK',
+  'EAF.PLC.CycleTimeMs',
+  'EAF.PLC.WatchdogOK',
+  'EAF.PLC.Heartbeat',
+]
+
+const realTagLabels: Record<string, string> = {
+  'EAF.HeatNumber': 'Heat Number',
+  'EAF.StageCode': 'Stage Code',
+  'EAF.SteelTemperature': 'Steel Temperature',
+  'EAF.PowerMW': 'Power',
+  'EAF.CurrentKA': 'Current',
+  'EAF.OxygenFlow': 'Oxygen Flow',
+  'EAF.TransformerTap': 'Transformer Tap',
+  'EAF.Ready': 'Ready',
+  'EAF.Running': 'Running',
+  'EAF.Fault': 'Fault',
+  'EAF.ArcOn': 'Arc On',
+  'EAF.OxygenOn': 'Oxygen On',
+  'EAF.BurnerOn': 'Burner On',
+  'EAF.InterlockOK': 'Interlock',
+  'EAF.CoolingWaterOK': 'Cooling Water',
+  'EAF.HydraulicOK': 'Hydraulic',
+  'EAF.PLC.CycleTimeMs': 'PLC Cycle Time',
+  'EAF.PLC.WatchdogOK': 'Watchdog',
+  'EAF.PLC.Heartbeat': 'Heartbeat',
+}
+
 function displayValue(value: HistorianValue): string {
   const raw = value.value_double ?? value.value_text
   if (raw === null || raw === undefined || raw === '') return '—'
   if (typeof raw === 'number') return raw.toLocaleString(undefined, { maximumFractionDigits: 2 })
   return String(raw)
+}
+
+function isBooleanTag(tagName: string): boolean {
+  return /(?:Ready|Running|Fault|ArcOn|OxygenOn|BurnerOn|Closed|OK|Heartbeat)$/.test(tagName)
+}
+
+function displayRealValue(value: HistorianValue): string {
+  const raw = value.value_double ?? value.value_text
+  if (isBooleanTag(value.tag_name)) {
+    const enabled = typeof raw === 'number'
+      ? raw !== 0
+      : ['1', 'true', 'on', 'yes'].includes(String(raw ?? '').toLowerCase())
+    return enabled ? 'ON' : 'OFF'
+  }
+  return displayValue(value)
 }
 
 function displayTime(value?: string | null, fractional = false): string {
@@ -94,12 +170,31 @@ function displayTime(value?: string | null, fractional = false): string {
   return fractional ? `${base}.${String(parsed.getMilliseconds()).padStart(3, '0')}` : base
 }
 
+function displayAge(age?: number | null): string {
+  if (age === null || age === undefined || Number.isNaN(age)) return '—'
+  if (age < 1) return `${Math.round(age * 1000)} ms`
+  if (age < 60) return `${age.toFixed(1)} s`
+  return `${Math.floor(age / 60)}m ${Math.round(age % 60)}s`
+}
+
 function chooseValues(area: string, values: HistorianValue[]): HistorianValue[] {
   const byTag = new Map(values.map((value) => [value.tag_name, value]))
   const selected = (preferredTags[area] ?? [])
     .map((tag) => byTag.get(tag))
     .filter((value): value is HistorianValue => value !== undefined)
   return selected.length > 0 ? selected : values.slice(0, 6)
+}
+
+function chooseRealValues(values: HistorianValue[]): HistorianValue[] {
+  const byTag = new Map(values.map((value) => [value.tag_name, value]))
+  const selected = realPreferredTags
+    .map((tag) => byTag.get(tag))
+    .filter((value): value is HistorianValue => value !== undefined)
+  return selected.length > 0 ? selected : values.slice(0, 20)
+}
+
+function realTagLabel(tagName: string): string {
+  return realTagLabels[tagName] ?? tagName.replace(/^EAF\./, '').replace(/^PLC\./, 'PLC ')
 }
 
 function directionLabel(direction: RawPacket['direction']): string {
@@ -122,6 +217,8 @@ function phaseLabel(packet: RawPacket): string {
 export function SystemMapTelemetryOverlay() {
   const [targets, setTargets] = useState<HTMLElement[]>([])
   const [valuesByArea, setValuesByArea] = useState<Record<string, HistorianValue[]>>({})
+  const [realSnapshot, setRealSnapshot] = useState<RealPlcSnapshot | null>(null)
+  const [realError, setRealError] = useState<string | null>(null)
   const [packetSnapshot, setPacketSnapshot] = useState<PacketSnapshot | null>(null)
   const [nodes, setNodes] = useState<Record<string, SystemNode>>({})
   const [openId, setOpenId] = useState<string | null>(null)
@@ -164,6 +261,39 @@ export function SystemMapTelemetryOverlay() {
     }
 
     void refresh()
+    return () => {
+      cancelled = true
+      if (timer !== null) window.clearTimeout(timer)
+    }
+  }, [targets.length])
+
+  useEffect(() => {
+    if (targets.length === 0) return
+
+    let cancelled = false
+    let timer: number | null = null
+
+    const refreshRealValues = async () => {
+      try {
+        const response = await authorizedFetch('/api/v1/real-plc/latest?area=EAF')
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`)
+        }
+        const payload = await response.json() as RealPlcSnapshot
+        if (!cancelled) {
+          setRealSnapshot(payload)
+          setRealError(null)
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setRealError(error instanceof Error ? error.message : 'Real PLC endpoint unavailable')
+        }
+      } finally {
+        if (!cancelled) timer = window.setTimeout(() => { void refreshRealValues() }, 1000)
+      }
+    }
+
+    void refreshRealValues()
     return () => {
       cancelled = true
       if (timer !== null) window.clearTimeout(timer)
@@ -236,6 +366,7 @@ export function SystemMapTelemetryOverlay() {
         const target = targets[index]
         if (!target) return null
         const values = controller.area ? chooseValues(controller.area, valuesByArea[controller.area] ?? []) : []
+        const realValues = controller.isReal ? chooseRealValues(realSnapshot?.values ?? []) : []
         const packetController = packetSnapshot?.controllers?.[controller.packetKey]
         const packets = packetController?.packets ?? []
         const latestPacket = packets[0]
@@ -252,10 +383,10 @@ export function SystemMapTelemetryOverlay() {
             onClick={() => toggle(controller.id)}
             onKeyDown={(event) => handleKey(event, controller.id)}
           >
-            <span>{controller.isReal ? 'RAW LINK' : 'LIVE DATA'}</span>
+            <span>{controller.isReal ? 'REAL DATA' : 'LIVE DATA'}</span>
             <div className="system-map-telemetry-popup" role="dialog" aria-label={`${controller.label} diagnostics`} onClick={keepPopupOpen}>
               <header>
-                <small>{controller.isReal ? 'REAL PLC DIAGNOSTICS' : 'PLC LIVE TRAFFIC'}</small>
+                <small>{controller.isReal ? 'VERIFIED PHYSICAL PLC TELEMETRY' : 'PLC LIVE TRAFFIC'}</small>
                 <strong>{controller.label}</strong>
                 <span>READ ONLY</span>
               </header>
@@ -263,18 +394,51 @@ export function SystemMapTelemetryOverlay() {
               <div className="system-map-telemetry-grid">
                 <section className="system-map-live-panel">
                   <div className="system-map-panel-title">
-                    <strong>{controller.isReal ? 'CONNECTION STATUS' : 'DECODED LIVE VALUES'}</strong>
-                    <small>{controller.isReal ? (node?.status ?? 'UNKNOWN').toUpperCase() : 'Historian'}</small>
+                    <strong>{controller.isReal ? 'REAL PROCESS VALUES' : 'DECODED LIVE VALUES'}</strong>
+                    <small>
+                      {controller.isReal
+                        ? (realSnapshot?.verified ? `${realSnapshot.source_kind} · ${realSnapshot.fresh ? 'LIVE' : 'STALE'}` : 'NO VERIFIED DATA')
+                        : 'Historian'}
+                    </small>
                   </div>
 
                   {controller.isReal ? (
-                    <div className="system-map-real-diagnostics">
-                      <div><span>Endpoint</span><code>{endpoint(node)}</code></div>
-                      <div><span>PLC</span><code>{node?.role ?? 'Siemens S7-400H · Rack 0 / Slot 3'}</code></div>
-                      <div><span>Status</span><code>{node?.status?.toUpperCase() ?? 'UNKNOWN'}</code></div>
-                      <div><span>Mode</span><code>READ ONLY</code></div>
-                      <p>{node?.detail ?? 'Waiting for current connection diagnostics.'}</p>
-                    </div>
+                    <>
+                      <div className="system-map-real-summary">
+                        <div><span>Endpoint</span><code>{endpoint(node)}</code></div>
+                        <div><span>PLC</span><code>{node?.role ?? 'Siemens S7-400H · Rack 0 / Slot 3'}</code></div>
+                        <div><span>Link</span><code>{node?.status?.toUpperCase() ?? 'UNKNOWN'}</code></div>
+                        <div><span>Sample Age</span><code>{displayAge(realSnapshot?.age_seconds)}</code></div>
+                      </div>
+
+                      <div className={`system-map-real-source ${realSnapshot?.verified ? (realSnapshot.fresh ? 'fresh' : 'stale') : 'empty'}`}>
+                        <div>
+                          <strong>{realSnapshot?.verified ? 'PHYSICAL SOURCE VERIFIED' : 'NO REAL PROCESS DATA'}</strong>
+                          <span>
+                            {realSnapshot?.verified
+                              ? `${realSnapshot.source_kind} · ${realSnapshot.source_endpoint ?? 'OPC UA gateway'}`
+                              : (realError ?? 'Waiting for historian samples marked source_kind=REAL_S7.')}
+                          </span>
+                        </div>
+                        <b>{realSnapshot?.verified ? (realSnapshot.fresh ? 'LIVE' : 'STALE') : 'WAITING'}</b>
+                      </div>
+
+                      <div className="system-map-telemetry-table system-map-real-values">
+                        <div className="system-map-telemetry-head"><span>TAG</span><span>VALUE</span><span>Q</span><span>TIME</span></div>
+                        {realValues.length > 0 ? realValues.map((value) => (
+                          <div className="system-map-telemetry-row" key={value.tag_name} title={value.tag_name}>
+                            <code>{realTagLabel(value.tag_name)}</code>
+                            <strong>{displayRealValue(value)} {isBooleanTag(value.tag_name) ? '' : (value.engineering_unit ?? '')}</strong>
+                            <span className={`quality-${(value.quality ?? 'unknown').toLowerCase()}`}>{value.quality ?? '—'}</span>
+                            <time>{displayTime(value.ts)}</time>
+                          </div>
+                        )) : (
+                          <div className="system-map-telemetry-empty">
+                            Real values will appear here only after a reviewed S7 DB/tag map is connected to the physical PLC.
+                          </div>
+                        )}
+                      </div>
+                    </>
                   ) : (
                     <div className="system-map-telemetry-table">
                       <div className="system-map-telemetry-head"><span>TAG</span><span>VALUE</span><span>Q</span><span>TIME</span></div>
@@ -325,12 +489,21 @@ export function SystemMapTelemetryOverlay() {
                       <code className="system-map-raw-hex">{latestPacket.raw_hex || 'No frame bytes captured yet.'}</code>
                     </div>
                   )}
+
+                  {controller.isReal && (
+                    <div className="system-map-real-diagnostics">
+                      <div><span>Mode</span><code>READ ONLY</code></div>
+                      <div><span>Historian</span><code>{realSnapshot?.verified ? 'REAL_S7 ONLY' : 'WAITING'}</code></div>
+                      <div><span>Last Sample</span><code>{displayTime(realSnapshot?.latest_sample_at, true)}</code></div>
+                      <p>{node?.detail ?? 'Waiting for current connection diagnostics.'}</p>
+                    </div>
+                  )}
                 </section>
               </div>
 
               <footer>
                 {controller.isReal
-                  ? 'Right side shows bytes returned by the physical PLC during read-only COTP/S7 session negotiation. No DB Read, Write, Force, Start, Stop, or PLC-control request is sent. Actual process DB bytes can be shown after a reviewed real DB/tag map is supplied.'
+                  ? 'Only historian samples explicitly marked source_kind=REAL_S7 are shown above. Simulator/OPC-UA test values are rejected from this panel. Raw traffic remains read-only; no Write, Force, Start, Stop, or PLC-control request is sent.'
                   : 'Left: decoded values consumed by Level 2. Right: passive raw TCP/102 capture from the Gateway network namespace.'}
               </footer>
             </div>

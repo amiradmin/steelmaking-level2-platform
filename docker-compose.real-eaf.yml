@@ -12,8 +12,13 @@ services:
       PLC_PACKET_CAPTURE_PATH: /capture/plc_packets.json
       PLC_PACKET_RING_SIZE: ${PLC_PACKET_RING_SIZE:-30}
     volumes:
-      - ${S7_ADDRESS_MAP_FILE:-./backend/plc_simulators/s7_address_map.json}:/app/s7_address_map.active.json:ro
+      - "${S7_ADDRESS_MAP_FILE:?Set S7_ADDRESS_MAP_FILE to a reviewed real PLC DB map}:/app/s7_address_map.active.json:ro"
       - plc_packet_capture:/capture
+
+  plc-ingestor-central-test:
+    environment:
+      # Only EAF is marked REAL_S7 in this override. LF/CCM remain simulator/OPC-UA data.
+      PLC_REAL_AREAS: EAF
 
   level2-api:
     environment:
@@ -34,13 +39,13 @@ volumes:
 # unused by the gateway. That keeps the normal plc-multi-test profile intact and
 # makes rollback to simulation immediate: simply omit this override file.
 #
-# S7_ADDRESS_MAP_FILE defaults to the simulator DB map. For the real plant PLC,
-# point it at a reviewed map that contains the actual S7-400 DB addresses and
-# types. The map is mounted read-only and does not require rebuilding the image.
+# S7_ADDRESS_MAP_FILE is REQUIRED here. The simulation DB map is intentionally
+# not accepted as a fallback for a physical PLC because the Live System Map must
+# never present simulator/test addresses as verified plant data.
 #
 # Production path with this override:
 #   real S7-400 EAF (ISO-on-TCP / S7, TCP/102)
 #        -> Central Gateway (python-snap7, read-only DB reads + passive capture)
 #        -> normalized OPC UA namespace
-#        -> PLC ingestor
+#        -> PLC ingestor (marks EAF samples source_kind=REAL_S7)
 #        -> historian / Level 2 API / dashboard

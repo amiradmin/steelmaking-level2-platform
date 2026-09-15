@@ -15,6 +15,7 @@ from .overview_live import overview_live
 from .plc_packets import plc_packets
 from .plc_sources import plc_sources
 from .production_flow import production_flow
+from .real_plc_values import real_plc_latest
 from .reports_dashboard import reports_dashboard
 from .system_map import live_system_map
 
@@ -33,6 +34,7 @@ urlpatterns = [
     path("production-flow", production_flow, name="production-flow"),
     path("plc-sources", plc_sources, name="plc-sources"),
     path("plc-packets", plc_packets, name="plc-packets"),
+    path("real-plc/latest", real_plc_latest, name="real-plc-latest"),
     path("system-map", live_system_map, name="live-system-map"),
     path("heats", views.list_heats, name="heat-list"),
     path("heats/<str:heat_no>", views.heat_detail, name="heat-detail"),

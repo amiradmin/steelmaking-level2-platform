@@ -34,6 +34,12 @@ POLL_INTERVAL_SECONDS: Final = float(os.getenv("PLC_POLL_INTERVAL_SECONDS", "1")
 RECONNECT_DELAY_SECONDS: Final = float(os.getenv("PLC_RECONNECT_DELAY_SECONDS", "5"))
 NODE_MAP_RAW: Final = os.getenv("PLC_NODE_MAP_JSON", "{}").strip()
 HEALTH_FILE: Final = Path(os.getenv("PLC_HEALTH_FILE", "/tmp/plc-ingestor-health.json"))
+SAMPLE_SOURCE_KIND: Final = (os.getenv("PLC_SAMPLE_SOURCE_KIND", "OPCUA").strip().upper() or "OPCUA")
+REAL_AREAS: Final = frozenset(
+    part.strip().upper()
+    for part in os.getenv("PLC_REAL_AREAS", "").split(",")
+    if part.strip()
+)
 
 
 class ConfigurationError(RuntimeError):
@@ -159,6 +165,16 @@ def opc_quality(status_code: Any) -> str:
     return "UNKNOWN"
 
 
+def source_area(tag_name: str) -> str:
+    """Return the process area prefix from a logical tag name."""
+    return tag_name.partition(".")[0].strip().upper()
+
+
+def source_kind_for_tag(tag_name: str) -> str:
+    """Mark only explicitly configured physical PLC areas as REAL_S7."""
+    return "REAL_S7" if source_area(tag_name) in REAL_AREAS else SAMPLE_SOURCE_KIND
+
+
 def write_sample(
     conn: Connection,
     *,
@@ -171,7 +187,7 @@ def write_sample(
     quality: str,
     status_code: str,
 ) -> None:
-    """Persist one OPC UA DataValue into TimescaleDB."""
+    """Persist one OPC UA DataValue into TimescaleDB with source provenance."""
     value_double, value_text = normalize_value(value)
     if value_double is None and value_text is None:
         LOGGER.warning("Skipping null value for %s (%s)", tag_name, node_id)
@@ -200,6 +216,10 @@ def write_sample(
             Jsonb(
                 {
                     "source": "OPCUA",
+                    "source_kind": source_kind_for_tag(tag_name),
+                    "source_area": source_area(tag_name),
+                    "source_endpoint": OPCUA_ENDPOINT,
+                    "transport": "OPCUA",
                     "node_id": node_id,
                     "status_code": status_code,
                 }
@@ -218,7 +238,12 @@ async def run_session(conn: Connection, node_map: dict[str, str], tag_ids: dict[
     write_health("connecting", f"Connecting to {OPCUA_ENDPOINT}")
     async with client:
         nodes = {tag_name: client.get_node(node_id) for tag_name, node_id in node_map.items()}
-        LOGGER.info("Connected to OPC UA server %s with %d mapped tags", OPCUA_ENDPOINT, len(nodes))
+        LOGGER.info(
+            "Connected to OPC UA server %s with %d mapped tags; real areas=%s",
+            OPCUA_ENDPOINT,
+            len(nodes),
+            ",".join(sorted(REAL_AREAS)) or "none",
+        )
 
         while True:
             heat_id = active_heat_id(conn)

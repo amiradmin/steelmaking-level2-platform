@@ -30,7 +30,7 @@ export function AboutSystem() {
         <article className="about-system-card">
           <span className="about-system-card-label">SOFTWARE DEVELOPMENT</span>
           <h2>Amir Behvandi</h2>
-          <p className="about-system-role">Software Developer / Industrial AI Engineer</p>
+          <p className="about-system-role">Software Developer</p>
           <p>
             Software implementation and application development for the Steelmaking Level 2 platform.
           </p>

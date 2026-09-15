@@ -1,3 +1,13 @@
+.dashboard-content.about-route-active > *:not(.about-route-surface) {
+  display: none !important;
+}
+
+.about-route-surface {
+  display: block;
+  width: 100%;
+  min-width: 0;
+}
+
 .about-system {
   display: flex;
   flex-direction: column;

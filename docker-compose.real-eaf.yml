@@ -9,6 +9,10 @@ services:
       OPCUA_GATEWAY_MAP_PATH: /app/s7_address_map.active.json
       OPCUA_GATEWAY_POLL_SECONDS: ${OPCUA_GATEWAY_POLL_SECONDS:-0.5}
       OPCUA_GATEWAY_RECONNECT_SECONDS: ${OPCUA_GATEWAY_RECONNECT_SECONDS:-2}
+      # Hybrid development mode: LF/CCM simulators may keep the gateway healthy
+      # while the physical EAF PLC is temporarily unreachable. The REAL PLC UI
+      # still reports EAF as unavailable until a verified GOOD physical read exists.
+      OPCUA_GATEWAY_REQUIRE_ALL_PLC: "0"
       PLC_PACKET_CAPTURE_PATH: /capture/plc_packets.json
       PLC_PACKET_RING_SIZE: ${PLC_PACKET_RING_SIZE:-30}
     volumes:

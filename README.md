@@ -69,10 +69,21 @@ legacy/frontend/                 Archived initial frontend scaffold
 
 ## Local startup
 
+Use the startup helper. It creates `.env` from `.env.example` when needed, builds the required images, starts the selected stack, and prints container status.
+
 ```bash
-cp .env.example .env
-docker compose up -d --build
+chmod +x scripts/start.sh
+./scripts/start.sh
 ```
+
+The default `normal` mode starts the core Level 2 stack plus the local OPC UA test path. Other supported modes are:
+
+```bash
+./scripts/start.sh multi-sim
+./scripts/start.sh real-eaf
+```
+
+`real-eaf` intentionally refuses to start unless `EAF_PLC_HOST` and a reviewed real `S7_ADDRESS_MAP_FILE` are provided. The simulation address map must not be used as verified plant mapping.
 
 Default services:
 

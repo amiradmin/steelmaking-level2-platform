@@ -312,6 +312,7 @@ services:
       - "${LEVEL2_API_PORT:-8080}:8080"
     volumes:
       - plc_packet_capture:/capture:ro
+      - django_static:/app/staticfiles
     healthcheck:
       test:
         - CMD
@@ -365,6 +366,7 @@ services:
       - "${NGINX_PORT:-80}:80"
     volumes:
       - ./infrastructure/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - django_static:/var/www/django-static:ro
     healthcheck:
       test:
         - CMD
@@ -383,6 +385,7 @@ services:
 volumes:
   historian_data:
   plc_packet_capture:
+  django_static:
 
 networks:
   level2-net:

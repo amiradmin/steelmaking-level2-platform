@@ -62,6 +62,8 @@ services:
     profiles:
       - plc-test
     image: steelmaking-level2-platform-plc-ingestor:latest
+    build:
+      context: ./backend/plc_ingestor
     container_name: steelmaking-level2-opcua-simulator
     restart: unless-stopped
     command: ["python", "opcua_simulator.py"]

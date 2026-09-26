@@ -76,10 +76,17 @@ chmod +x scripts/start.sh
 ./scripts/start.sh
 ```
 
+Normal startup reuses local images and does not rebuild them. After dependency or Dockerfile changes, rebuild explicitly:
+
+```bash
+./scripts/start.sh --build
+```
+
 The default `normal` mode starts the core Level 2 stack plus the local OPC UA test path. Other supported modes are:
 
 ```bash
 ./scripts/start.sh multi-sim
+./scripts/start.sh multi-sim --build
 ./scripts/start.sh real-eaf
 ```
 

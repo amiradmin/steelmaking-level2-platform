@@ -126,6 +126,10 @@ CREATE INDEX IF NOT EXISTS ix_process_samples_heat_ts
     WHERE heat_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS ix_process_samples_quality_ts
     ON process_samples(quality, ts DESC);
+CREATE INDEX IF NOT EXISTS ix_process_samples_real_s7_good_tag_ts
+    ON process_samples(tag_id, ts DESC)
+    WHERE quality = 'GOOD'
+      AND attributes ->> 'source_kind' = 'REAL_S7';
 
 CREATE TABLE IF NOT EXISTS heat_events (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

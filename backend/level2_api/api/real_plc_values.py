@@ -33,32 +33,44 @@ def _latest_real_values(area: str) -> list[dict[str, Any]]:
     with connection.cursor() as cursor:
         cursor.execute(
             """
-            SELECT DISTINCT ON (ps.tag_id)
+            SELECT
                 pt.tag_name,
                 pt.engineering_unit,
                 e.code AS equipment_code,
                 e.area,
-                ps.value_double,
-                ps.value_text,
-                ps.quality::text AS quality,
-                ps.ts,
+                latest.value_double,
+                latest.value_text,
+                latest.quality::text AS quality,
+                latest.ts,
                 h.heat_no,
-                ps.attributes->>'source_kind' AS source_kind,
-                ps.attributes->>'source_endpoint' AS source_endpoint,
-                ps.attributes->>'transport' AS transport,
-                ps.attributes->>'node_id' AS node_id,
-                ps.attributes->>'status_code' AS status_code
-            FROM process_samples ps
-            JOIN process_tags pt ON pt.id = ps.tag_id
-            LEFT JOIN equipment e ON e.id = pt.equipment_id
-            LEFT JOIN heats h ON h.id = ps.heat_id
+                latest.attributes->>'source_kind' AS source_kind,
+                latest.attributes->>'source_endpoint' AS source_endpoint,
+                latest.attributes->>'transport' AS transport,
+                latest.attributes->>'node_id' AS node_id,
+                latest.attributes->>'status_code' AS status_code
+            FROM process_tags pt
+            JOIN equipment e ON e.id = pt.equipment_id
+            JOIN LATERAL (
+                SELECT
+                    ps.value_double,
+                    ps.value_text,
+                    ps.quality,
+                    ps.ts,
+                    ps.heat_id,
+                    ps.attributes
+                FROM process_samples ps
+                WHERE ps.tag_id = pt.id
+                  AND ps.attributes->>'source_kind' = %s
+                  AND ps.quality = 'GOOD'
+                ORDER BY ps.ts DESC
+                LIMIT 1
+            ) latest ON TRUE
+            LEFT JOIN heats h ON h.id = latest.heat_id
             WHERE pt.is_active = TRUE
               AND e.area = %s
-              AND ps.attributes->>'source_kind' = %s
-              AND ps.quality = 'GOOD'
-            ORDER BY ps.tag_id, ps.ts DESC
+            ORDER BY pt.tag_name
             """,
-            [area, REAL_SOURCE_KIND],
+            [REAL_SOURCE_KIND, area],
         )
         return _dictfetchall(cursor)
 

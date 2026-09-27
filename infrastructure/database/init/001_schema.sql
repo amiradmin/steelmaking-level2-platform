@@ -197,19 +197,30 @@ CREATE INDEX IF NOT EXISTS ix_material_consumptions_heat
     ON material_consumptions(heat_id, addition_time);
 
 CREATE OR REPLACE VIEW latest_process_values AS
-SELECT DISTINCT ON (ps.tag_id)
-    ps.tag_id,
+SELECT
+    pt.id AS tag_id,
     pt.tag_name,
     pt.engineering_unit,
-    ps.ts,
-    ps.ingested_at,
-    ps.heat_id,
-    ps.value_double,
-    ps.value_text,
-    ps.quality
-FROM process_samples ps
-JOIN process_tags pt ON pt.id = ps.tag_id
-ORDER BY ps.tag_id, ps.ts DESC;
+    latest.ts,
+    latest.ingested_at,
+    latest.heat_id,
+    latest.value_double,
+    latest.value_text,
+    latest.quality
+FROM process_tags pt
+JOIN LATERAL (
+    SELECT
+        ps.ts,
+        ps.ingested_at,
+        ps.heat_id,
+        ps.value_double,
+        ps.value_text,
+        ps.quality
+    FROM process_samples ps
+    WHERE ps.tag_id = pt.id
+    ORDER BY ps.ts DESC
+    LIMIT 1
+) latest ON TRUE;
 
 CREATE OR REPLACE VIEW active_heats AS
 SELECT *

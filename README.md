@@ -136,3 +136,18 @@ The current environment is intentionally local and containerized. Production dep
 ## Status
 
 **Phase: Pre-server engineering foundation + executable Level 2 core prototype**
+
+
+## Project management
+
+Project control is maintained in [docs/project-management/CONTROL_CENTER.md](docs/project-management/CONTROL_CENTER.md).
+
+Planning artifacts include:
+- roadmap and milestone windows;
+- Mermaid Gantt chart;
+- RAID register;
+- governance / Definition of Ready / Definition of Done;
+- open milestone trackers, Epics and child Issues;
+- standardized task, defect and change-request issue templates.
+
+Project-management items are intentionally kept open until explicitly reviewed and approved.

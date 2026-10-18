@@ -1,0 +1,28 @@
+address,type,name,unit,description
+DB100.DBD0,REAL,EAF.PowerMW,MW,EAF active power
+DB100.DBD4,REAL,EAF.CurrentKA,kA,EAF current
+DB100.DBD8,REAL,EAF.OxygenFlow,Nm3/h,Oxygen flow
+DB100.DBD12,REAL,EAF.SteelTemperature,degC,Steel temperature
+DB100.DBD16,REAL,EAF.ElectrodePositionPercent,percent,Electrode position
+DB100.DBD20,REAL,EAF.CoolingWaterFlowM3h,m3/h,Cooling water flow
+DB100.DBW24,INT,EAF.TransformerTap,,Transformer tap
+DB100.DBW26,INT,EAF.StageCode,,1=CHARGE 2=MELTING 3=REFINING 4=SUPERHEAT 5=TAPPING
+DB100.DBD28,DINT,EAF.HeatNumber,,Heat number
+DB100.DBX32.0,BOOL,EAF.Ready,,Ready status
+DB100.DBX32.1,BOOL,EAF.Running,,Running status
+DB100.DBX32.2,BOOL,EAF.Fault,,Fault status
+DB100.DBX32.3,BOOL,EAF.ArcOn,,Arc status
+DB100.DBX32.4,BOOL,EAF.OxygenOn,,Oxygen status
+DB100.DBX32.5,BOOL,EAF.BurnerOn,,Burner status
+DB100.DBX32.6,BOOL,EAF.RoofClosed,,Roof status
+DB100.DBX32.7,BOOL,EAF.DoorClosed,,Door status
+DB100.DBX33.0,BOOL,EAF.HydraulicOK,,Hydraulic healthy
+DB100.DBX33.1,BOOL,EAF.CoolingWaterOK,,Cooling water healthy
+DB100.DBX33.2,BOOL,EAF.TransformerReady,,Transformer ready
+DB100.DBX33.3,BOOL,EAF.InterlockOK,,Interlocks healthy
+DB100.DBW34,INT,EAF.AlarmCode,,Zero means no alarm
+DB110.DBD0,DINT,EAF.PLC.ScanCounter,,OB1 scan counter
+DB110.DBD4,REAL,EAF.PLC.CycleTimeMs,ms,Previous OB1 cycle time
+DB110.DBX8.0,BOOL,EAF.PLC.WatchdogOK,,PLC watchdog status
+DB110.DBX8.1,BOOL,EAF.PLC.CommsOK,,Level 2 data interface status
+DB110.DBX8.2,BOOL,EAF.PLC.Heartbeat,,Toggles approximately once per second

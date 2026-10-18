@@ -21,6 +21,7 @@ function dateLabel(value?: string | null): string {
 
 export function LicenseNotice({ children }: PropsWithChildren) {
   const [license, setLicense] = useState<LicenseSnapshot | null>(null)
+  const [dismissedNotice, setDismissedNotice] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -46,7 +47,8 @@ export function LicenseNotice({ children }: PropsWithChildren) {
     }
   }, [])
 
-  const visible = license && license.status !== 'DEVELOPMENT'
+  const noticeKey = license ? `${license.status}:${license.message}` : null
+  const visible = license && license.status !== 'DEVELOPMENT' && dismissedNotice !== noticeKey
   const tone = license?.status.toLowerCase().replace('_', '-') ?? 'active'
   const remaining = typeof license?.days_remaining === 'number'
     ? `${license.days_remaining} day${license.days_remaining === 1 ? '' : 's'}`
@@ -69,6 +71,15 @@ export function LicenseNotice({ children }: PropsWithChildren) {
               {license.expires_at ? ` · expires ${dateLabel(license.expires_at)}` : ''}
             </small>
           </div>
+          <button
+            className="license-notice-close"
+            type="button"
+            aria-label="Dismiss license notification"
+            title="Close"
+            onClick={() => setDismissedNotice(noticeKey)}
+          >
+            ×
+          </button>
         </aside>
       )}
     </>

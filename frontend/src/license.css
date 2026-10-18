@@ -4,7 +4,7 @@
   bottom: 18px;
   z-index: 10000;
   max-width: min(440px, calc(100vw - 36px));
-  padding: 11px 14px;
+  padding: 11px 42px 11px 14px;
   display: flex;
   align-items: flex-start;
   gap: 10px;
@@ -23,7 +23,23 @@
   background: var(--cyan);
   box-shadow: 0 0 10px var(--cyan);
 }
-.license-notice-copy { display: flex; flex-direction: column; gap: 3px; }
+.license-notice-copy { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.license-notice-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--text) 16%, transparent);
+  border-radius: 6px;
+  color: var(--text);
+  background: color-mix(in srgb, var(--text) 7%, transparent);
+  font: 500 20px/22px sans-serif;
+  cursor: pointer;
+}
+.license-notice-close:hover { border-color: var(--cyan); color: var(--cyan); background: color-mix(in srgb, var(--cyan) 12%, transparent); }
+.license-notice-close:focus-visible { outline: 2px solid var(--cyan); outline-offset: 1px; }
 .license-notice strong { color: var(--cyan); font: 800 10px 'JetBrains Mono', monospace; letter-spacing: .06em; }
 .license-notice span { color: var(--text); font-size: 11px; line-height: 1.45; }
 .license-notice small { color: var(--muted); font-size: 9px; }

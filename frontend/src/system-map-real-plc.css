@@ -94,9 +94,16 @@
 }
 
 .system-map-real-values {
-  max-height: 420px;
+  /* Keep the detail panel compact; the complete tag list remains scrollable. */
+  max-height: 250px;
   overflow: auto;
   border-color: color-mix(in srgb, var(--amber) 20%, var(--border-soft));
+}
+
+.system-map-real-values .system-map-telemetry-row {
+  min-height: 26px;
+  padding-top: 4px;
+  padding-bottom: 4px;
 }
 
 .system-map-real-values .system-map-telemetry-row strong {
@@ -124,6 +131,21 @@
   margin-top: 8px;
 }
 
+/* The physical PLC node is the right-most node in the map.  Its diagnostics
+ * can be taller than the lower half of a laptop viewport, so keep the opened
+ * panel inside the viewport and let its own content scroll. */
+.system-map-telemetry-anchor.real.open .system-map-telemetry-popup {
+  position: fixed;
+  top: 24px;
+  right: auto;
+  bottom: 24px;
+  left: 50vw;
+  width: min(1040px, calc(100vw - 42px));
+  max-height: none;
+  overflow-y: auto;
+  transform: translate(-50%, 0) scale(1);
+}
+
 @media (max-width: 1100px) {
   .system-map-telemetry-anchor.real .system-map-telemetry-popup {
     width: min(760px, calc(100vw - 36px));
@@ -131,6 +153,12 @@
 }
 
 @media (max-width: 700px) {
+  .system-map-telemetry-anchor.real.open .system-map-telemetry-popup {
+    top: 16px;
+    bottom: 16px;
+    width: calc(100vw - 28px);
+  }
+
   .system-map-real-summary {
     grid-template-columns: 1fr;
   }

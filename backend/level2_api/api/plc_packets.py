@@ -199,6 +199,51 @@ def _real_plc_entry() -> dict[str, Any]:
         return entry
 
 
+def _passive_real_packets(controllers: dict[str, Any]) -> dict[str, Any] | None:
+    """Return the passive gateway capture when it belongs to the configured PLC.
+
+    The OPC UA gateway keeps a read-only S7 session open and continuously reads
+    the reviewed DB map.  Those responses are the most useful raw diagnostics:
+    unlike a session-negotiation probe, their payload changes as PLC values
+    change.  In a real-EAF deployment the packet monitor labels this controller
+    as ``EAF``, so match it by its resolved endpoint instead of hard-coding the
+    label.
+    """
+    real_host = os.getenv("REAL_PLC_HOST", "192.168.1.10").strip() or "192.168.1.10"
+    real_port = _env_int("REAL_PLC_PORT", 102)
+    try:
+        real_ip = socket.gethostbyname(real_host)
+    except OSError:
+        real_ip = real_host
+
+    for name, entry in controllers.items():
+        if not isinstance(entry, dict):
+            continue
+        packets = entry.get("packets")
+        if not isinstance(packets, list) or not packets:
+            continue
+        endpoint = str(entry.get("resolved_ip") or entry.get("host") or "")
+        if endpoint != real_ip:
+            continue
+        if not any(
+            str(packet.get("src_ip")) == real_ip and int(packet.get("src_port", 0)) == real_port
+            for packet in packets
+            if isinstance(packet, dict)
+        ):
+            continue
+        return {
+            "host": real_host,
+            "resolved_ip": real_ip,
+            "rack": _env_int("REAL_PLC_RACK", 0),
+            "slot": _env_int("REAL_PLC_SLOT", 3),
+            "read_only": True,
+            "probe_mode": f"PASSIVE_GATEWAY_CAPTURE_{name}",
+            "error": None,
+            "packets": packets,
+        }
+    return None
+
+
 @api_view(["GET"])
 def plc_packets(request: Request) -> Response:
     """Return a small read-only window of recent TCP/102 packets for diagnostics."""
@@ -227,7 +272,10 @@ def plc_packets(request: Request) -> Response:
             "packets": packets[:limit] if isinstance(packets, list) else [],
         }
 
-    real_entry = _real_plc_entry()
+    # Prefer the raw responses from the Gateway's persistent, read-only DB
+    # reads.  The lightweight session probe remains a safe fallback when the
+    # passive capture has not yet received its first real PLC response.
+    real_entry = _passive_real_packets(controllers) or _real_plc_entry()
     real_packets = real_entry.get("packets")
     trimmed["REAL"] = {
         **real_entry,

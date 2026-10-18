@@ -1,0 +1,278 @@
+// -----------------------------------------------------------------------------
+// EAF Level 2 integration test program
+// Target: SIMATIC S7-400H CPU 417-4H, 6ES7 417-4HT14-0AB0, FW V4.5.5
+// Engineering: STEP 7 Classic / SIMATIC Manager
+//
+// SAFETY: This source does not read or write I, Q, PI, PQ, peripheral, or field
+// addresses. It only updates DB100 and DB110 for a read-only Level 2 client.
+// DB100 and DB110 offsets are part of the steelmaking-level2-platform contract.
+// -----------------------------------------------------------------------------
+
+DATA_BLOCK DB 100
+TITLE = EAF Level 2 process test data
+VERSION : 0.1
+STRUCT
+  PowerMW                     : REAL := 0.000000e+000;  // DBD0
+  CurrentKA                   : REAL := 0.000000e+000;  // DBD4
+  OxygenFlow                  : REAL := 0.000000e+000;  // DBD8
+  SteelTemperature            : REAL := 1.450000e+003;  // DBD12
+  ElectrodePositionPercent    : REAL := 9.000000e+001;  // DBD16
+  CoolingWaterFlowM3h         : REAL := 7.900000e+002;  // DBD20
+  TransformerTap              : INT  := 0;              // DBW24
+  StageCode                   : INT  := 1;              // DBW26
+  HeatNumber                  : DINT := L#260001;        // DBD28
+  Ready                       : BOOL := FALSE;           // DBX32.0
+  Running                     : BOOL := TRUE;            // DBX32.1
+  Fault                       : BOOL := FALSE;           // DBX32.2
+  ArcOn                       : BOOL := FALSE;           // DBX32.3
+  OxygenOn                    : BOOL := FALSE;           // DBX32.4
+  BurnerOn                    : BOOL := FALSE;           // DBX32.5
+  RoofClosed                  : BOOL := FALSE;           // DBX32.6
+  DoorClosed                  : BOOL := TRUE;            // DBX32.7
+  HydraulicOK                 : BOOL := TRUE;            // DBX33.0
+  CoolingWaterOK              : BOOL := TRUE;            // DBX33.1
+  TransformerReady            : BOOL := TRUE;            // DBX33.2
+  InterlockOK                 : BOOL := TRUE;            // DBX33.3
+  ReservedStatus1             : BOOL := FALSE;           // DBX33.4
+  ReservedStatus2             : BOOL := FALSE;           // DBX33.5
+  ReservedStatus3             : BOOL := FALSE;           // DBX33.6
+  ReservedStatus4             : BOOL := FALSE;           // DBX33.7
+  AlarmCode                   : INT  := 0;                // DBW34
+  TestSeconds                 : DINT := L#0;              // DBD36, internal
+END_STRUCT;
+BEGIN
+END_DATA_BLOCK
+
+
+DATA_BLOCK DB 110
+TITLE = EAF Level 2 PLC diagnostics
+VERSION : 0.1
+STRUCT
+  ScanCounter                 : DINT := L#0;              // DBD0
+  CycleTimeMs                 : REAL := 0.000000e+000;    // DBD4
+  WatchdogOK                  : BOOL := TRUE;             // DBX8.0
+  CommsOK                     : BOOL := TRUE;             // DBX8.1
+  Heartbeat                   : BOOL := FALSE;            // DBX8.2
+  ReservedBit3                : BOOL := FALSE;            // DBX8.3
+  ReservedBit4                : BOOL := FALSE;            // DBX8.4
+  ReservedBit5                : BOOL := FALSE;            // DBX8.5
+  ReservedBit6                : BOOL := FALSE;            // DBX8.6
+  ReservedBit7                : BOOL := FALSE;            // DBX8.7
+  ReservedByte                : BYTE := B#16#0;           // DBB9
+  HeartbeatElapsedMs          : DINT := L#0;              // DBD10, internal
+END_STRUCT;
+BEGIN
+END_DATA_BLOCK
+
+
+ORGANIZATION_BLOCK OB 1
+TITLE = EAF Level 2 safe integration test
+VERSION : 0.1
+VAR_TEMP
+  OB1_EV_CLASS                : BYTE;
+  OB1_SCAN_1                  : BYTE;
+  OB1_PRIORITY                : BYTE;
+  OB1_OB_NUMBR                : BYTE;
+  OB1_RESERVED_1              : BYTE;
+  OB1_RESERVED_2              : BYTE;
+  OB1_PREV_CYCLE              : INT;
+  OB1_MIN_CYCLE               : INT;
+  OB1_MAX_CYCLE               : INT;
+  OB1_DATE_TIME               : DATE_AND_TIME;
+END_VAR
+BEGIN
+
+NETWORK
+TITLE = PLC diagnostics and scan counter
+      L     DB110.DBD    0;
+      L     L#1;
+      +D;
+      T     DB110.DBD    0;
+
+      L     #OB1_PREV_CYCLE;
+      ITD;
+      DTR;
+      T     DB110.DBD    4;
+
+      S     DB110.DBX    8.0;
+      S     DB110.DBX    8.1;
+
+NETWORK
+TITLE = Generate a one-second heartbeat without touching hardware timers or IO
+      L     #OB1_PREV_CYCLE;
+      ITD;
+      L     DB110.DBD   10;
+      +D;
+      T     DB110.DBD   10;
+
+      L     DB110.DBD   10;
+      L     L#1000;
+      >=D;
+      JCN   STAG;
+
+      L     DB110.DBD   10;
+      L     L#1000;
+      -D;
+      T     DB110.DBD   10;
+
+      AN    DB110.DBX    8.2;
+      =     DB110.DBX    8.2;
+
+      L     DB100.DBD   36;
+      L     L#1;
+      +D;
+      T     DB100.DBD   36;
+
+      L     DB100.DBD   36;
+      L     L#65;
+      >=D;
+      JCN   STAG;
+
+      L     L#0;
+      T     DB100.DBD   36;
+      L     DB100.DBD   28;
+      L     L#1;
+      +D;
+      T     DB100.DBD   28;
+
+NETWORK
+TITLE = Common healthy test-rack status
+STAG: R     DB100.DBX   32.0;
+      S     DB100.DBX   32.1;
+      R     DB100.DBX   32.2;
+      R     DB100.DBX   32.3;
+      R     DB100.DBX   32.4;
+      R     DB100.DBX   32.5;
+      S     DB100.DBX   32.6;
+      S     DB100.DBX   32.7;
+      S     DB100.DBX   33.0;
+      S     DB100.DBX   33.1;
+      S     DB100.DBX   33.2;
+      S     DB100.DBX   33.3;
+      L     7.900000e+002;
+      T     DB100.DBD   20;
+      L     0;
+      T     DB100.DBW   34;
+
+NETWORK
+TITLE = Select a 65-second EAF demonstration stage
+      L     DB100.DBD   36;
+      L     L#10;
+      <D;
+      JC    CHRG;
+
+      L     DB100.DBD   36;
+      L     L#40;
+      <D;
+      JC    MELT;
+
+      L     DB100.DBD   36;
+      L     L#53;
+      <D;
+      JC    REFN;
+
+      L     DB100.DBD   36;
+      L     L#58;
+      <D;
+      JC    SUPR;
+      JU    TAPP;
+
+NETWORK
+TITLE = Stage 1 - CHARGE
+CHRG: L     0.000000e+000;
+      T     DB100.DBD    0;
+      T     DB100.DBD    4;
+      T     DB100.DBD    8;
+      L     1.450000e+003;
+      T     DB100.DBD   12;
+      L     9.000000e+001;
+      T     DB100.DBD   16;
+      L     0;
+      T     DB100.DBW   24;
+      L     1;
+      T     DB100.DBW   26;
+      R     DB100.DBX   32.6;
+      JU    DONE;
+
+NETWORK
+TITLE = Stage 2 - MELTING
+MELT: L     6.300000e+001;
+      T     DB100.DBD    0;
+      L     4.600000e+001;
+      T     DB100.DBD    4;
+      L     1.200000e+003;
+      T     DB100.DBD    8;
+      L     1.530000e+003;
+      T     DB100.DBD   12;
+      L     4.800000e+001;
+      T     DB100.DBD   16;
+      L     14;
+      T     DB100.DBW   24;
+      L     2;
+      T     DB100.DBW   26;
+      S     DB100.DBX   32.3;
+      S     DB100.DBX   32.4;
+      S     DB100.DBX   32.5;
+      JU    DONE;
+
+NETWORK
+TITLE = Stage 3 - REFINING
+REFN: L     4.800000e+001;
+      T     DB100.DBD    0;
+      L     3.800000e+001;
+      T     DB100.DBD    4;
+      L     3.300000e+003;
+      T     DB100.DBD    8;
+      L     1.590000e+003;
+      T     DB100.DBD   12;
+      L     5.400000e+001;
+      T     DB100.DBD   16;
+      L     10;
+      T     DB100.DBW   24;
+      L     3;
+      T     DB100.DBW   26;
+      S     DB100.DBX   32.3;
+      S     DB100.DBX   32.4;
+      JU    DONE;
+
+NETWORK
+TITLE = Stage 4 - SUPERHEAT
+SUPR: L     3.900000e+001;
+      T     DB100.DBD    0;
+      L     3.200000e+001;
+      T     DB100.DBD    4;
+      L     4.500000e+002;
+      T     DB100.DBD    8;
+      L     1.630000e+003;
+      T     DB100.DBD   12;
+      L     5.800000e+001;
+      T     DB100.DBD   16;
+      L     8;
+      T     DB100.DBW   24;
+      L     4;
+      T     DB100.DBW   26;
+      S     DB100.DBX   32.3;
+      JU    DONE;
+
+NETWORK
+TITLE = Stage 5 - TAPPING
+TAPP: L     0.000000e+000;
+      T     DB100.DBD    0;
+      T     DB100.DBD    4;
+      T     DB100.DBD    8;
+      L     1.636000e+003;
+      T     DB100.DBD   12;
+      L     9.500000e+001;
+      T     DB100.DBD   16;
+      L     0;
+      T     DB100.DBW   24;
+      L     5;
+      T     DB100.DBW   26;
+      R     DB100.DBX   32.6;
+      R     DB100.DBX   32.7;
+
+NETWORK
+TITLE = End of cyclic test program
+DONE: NOP   0;
+
+END_ORGANIZATION_BLOCK

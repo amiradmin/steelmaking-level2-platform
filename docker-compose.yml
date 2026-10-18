@@ -75,8 +75,6 @@ services:
       - level2-net
 
   eaf-plc-simulator:
-    profiles:
-      - plc-multi-test
     image: steelmaking-level2-platform-plc-simulators:latest
     build:
       context: ./backend/plc_simulators
@@ -100,8 +98,6 @@ services:
       - level2-net
 
   lf-plc-simulator:
-    profiles:
-      - plc-multi-test
     image: steelmaking-level2-platform-plc-simulators:latest
     container_name: steelmaking-level2-lf-plc-simulator
     restart: unless-stopped
@@ -123,8 +119,6 @@ services:
       - level2-net
 
   ccm-plc-simulator:
-    profiles:
-      - plc-multi-test
     image: steelmaking-level2-platform-plc-simulators:latest
     build:
       context: ./backend/plc_simulators
@@ -148,8 +142,6 @@ services:
       - level2-net
 
   central-opcua-server:
-    profiles:
-      - plc-multi-test
     image: steelmaking-level2-platform-central-opcua:latest
     build:
       context: ./backend
@@ -190,8 +182,6 @@ services:
       - level2-net
 
   plc-ingestor-central-test:
-    profiles:
-      - plc-multi-test
     image: steelmaking-level2-platform-plc-ingestor:latest
     build:
       context: ./backend/plc_ingestor

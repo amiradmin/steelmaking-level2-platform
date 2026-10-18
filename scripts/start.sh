@@ -41,10 +41,10 @@ set +a
 
 case "$MODE" in
   normal)
-    COMPOSE=(docker compose --profile plc-test)
+    COMPOSE=(docker compose)
     ;;
   multi-sim)
-    COMPOSE=(docker compose --profile plc-multi-test)
+    COMPOSE=(docker compose)
     ;;
   real-eaf)
     [[ -n "${EAF_PLC_HOST:-}" ]] || { echo "ERROR: set EAF_PLC_HOST in .env before real-eaf startup." >&2; exit 1; }

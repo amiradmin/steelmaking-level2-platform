@@ -82,12 +82,16 @@ Normal startup reuses local images and does not rebuild them. After dependency o
 ./scripts/start.sh --build
 ```
 
-The default `normal` mode starts the core Level 2 stack plus the local OPC UA test path. Other supported modes are:
+The default startup command starts the complete local simulation stack: core Level 2 services, EAF/LF/CCM PLC simulators, the central OPC UA gateway, and the historian ingestor. Other supported modes are:
 
 ```bash
-./scripts/start.sh multi-sim
-./scripts/start.sh multi-sim --build
 ./scripts/start.sh real-eaf
+```
+
+The same full local stack starts directly with:
+
+```bash
+docker compose up -d
 ```
 
 `real-eaf` intentionally refuses to start unless `EAF_PLC_HOST` and a reviewed real `S7_ADDRESS_MAP_FILE` are provided. The simulation address map must not be used as verified plant mapping.

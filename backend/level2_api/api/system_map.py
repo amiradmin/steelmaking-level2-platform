@@ -84,22 +84,49 @@ def _latest_controller_samples() -> dict[str, dict[str, Any]]:
     with connection.cursor() as cursor:
         cursor.execute(
             """
+            WITH controller_tags AS (
+                SELECT
+                    pt.id AS tag_id,
+                    CASE
+                        WHEN pt.tag_name LIKE 'EAF.%%' THEN 'eaf'
+                        WHEN pt.tag_name LIKE 'LF.%%' THEN 'lf'
+                        WHEN pt.tag_name LIKE 'CCM.%%' THEN 'ccm'
+                    END AS controller
+                FROM process_tags pt
+                WHERE pt.tag_name LIKE 'EAF.%%'
+                   OR pt.tag_name LIKE 'LF.%%'
+                   OR pt.tag_name LIKE 'CCM.%%'
+            ),
+            latest_by_controller AS (
+                SELECT
+                    ct.controller,
+                    MAX(latest.ts) AS last_sample_at
+                FROM controller_tags ct
+                JOIN LATERAL (
+                    SELECT ps.ts
+                    FROM process_samples ps
+                    WHERE ps.tag_id = ct.tag_id
+                    ORDER BY ps.ts DESC
+                    LIMIT 1
+                ) latest ON TRUE
+                GROUP BY ct.controller
+            ),
+            recent_counts AS (
+                SELECT
+                    ct.controller,
+                    COUNT(*) AS samples_last_window
+                FROM process_samples ps
+                JOIN controller_tags ct ON ct.tag_id = ps.tag_id
+                WHERE ps.ts >= NOW() - (%s * INTERVAL '1 second')
+                GROUP BY ct.controller
+            )
             SELECT
-                CASE
-                    WHEN pt.tag_name LIKE 'EAF.%%' THEN 'eaf'
-                    WHEN pt.tag_name LIKE 'LF.%%' THEN 'lf'
-                    WHEN pt.tag_name LIKE 'CCM.%%' THEN 'ccm'
-                END AS controller,
-                MAX(ps.ts) AS last_sample_at,
-                COUNT(*) FILTER (
-                    WHERE ps.ts >= NOW() - (%s * INTERVAL '1 second')
-                ) AS samples_last_window
-            FROM process_samples ps
-            JOIN process_tags pt ON pt.id = ps.tag_id
-            WHERE pt.tag_name LIKE 'EAF.%%'
-               OR pt.tag_name LIKE 'LF.%%'
-               OR pt.tag_name LIKE 'CCM.%%'
-            GROUP BY 1
+                latest.controller,
+                latest.last_sample_at,
+                COALESCE(recent.samples_last_window, 0) AS samples_last_window
+            FROM latest_by_controller latest
+            LEFT JOIN recent_counts recent USING (controller)
+            ORDER BY latest.controller
             """,
             [FRESH_AFTER_SECONDS],
         )

@@ -55,3 +55,21 @@
 @media (max-width: 1100px) { .system-map-telemetry-popup { width: min(760px, calc(100vw - 36px)); } .system-map-telemetry-grid { grid-template-columns: 1fr; } }
 @media (max-width: 900px) { .system-map-telemetry-popup { width: min(680px, calc(100vw - 36px)); left: 50% !important; right: auto !important; top: calc(100% + 10px); bottom: auto; transform: translate(-50%, -8px) scale(.985) !important; } .plc-row .system-map-node:hover .system-map-telemetry-popup, .plc-row .system-map-node:focus-within .system-map-telemetry-popup, .system-map-telemetry-anchor.open .system-map-telemetry-popup { transform: translate(-50%, 0) scale(1) !important; } }
 @media (prefers-reduced-motion: reduce) { .system-map-telemetry-popup { transition: none; } }
+
+
+/* Popup content must override the trigger's user-select:none so operators can
+   select/copy live tag values and raw packet diagnostics. */
+.system-map-telemetry-popup,
+.system-map-telemetry-popup * {
+  -webkit-user-select: text;
+  user-select: text;
+}
+.system-map-telemetry-popup {
+  cursor: text;
+}
+.system-map-telemetry-popup code,
+.system-map-telemetry-popup strong,
+.system-map-telemetry-popup span,
+.system-map-telemetry-popup time {
+  cursor: text;
+}

@@ -380,7 +380,12 @@ export function SystemMapTelemetryOverlay() {
             role="button"
             aria-expanded={isOpen}
             aria-label={`Open live diagnostics for ${controller.label}`}
-            onClick={() => toggle(controller.id)}
+            onClick={() => {
+              // Selecting text inside the popup can generate a click after mouseup.
+              // Do not interpret that click as a request to close the diagnostics.
+              if (window.getSelection()?.toString()) return
+              toggle(controller.id)
+            }}
             onKeyDown={(event) => handleKey(event, controller.id)}
           >
             <span>{controller.isReal ? 'REAL DATA' : 'LIVE DATA'}</span>

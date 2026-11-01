@@ -1,23 +1,23 @@
 # CCM R&D PLC Commissioning Plan
 
-## Purpose and operating boundary
+## Purpose and architecture
 
-Build a controlled R&D demonstration in which an Ubuntu-hosted synthetic CCM
-generator produces continuous-casting values and writes them into two dedicated
-data blocks on the physical Siemens S7-400H. The Level-2 gateway reads those
-values over S7 communication, exposes them through OPC UA, and the historian
-and System Map display them.
+Build a standalone synthetic CCM process demonstration on the Siemens
+S7-400H test CPU. The PLC-native application is authored in Siemens S7-SCL
+source under [plc/s7_400h_ccm_rnd](../../plc/s7_400h_ccm_rnd/README.md).
 
-These are **Ubuntu-generated R&D test values**, not PLC-generated values or
-plant measurements. Their provenance must be stored and displayed as
-`RND_PLC_TEST`. They must never be labelled `REAL_S7`, production telemetry,
-or actual process measurements.
+The intended data flow is:
 
-The PLC is used only as a data-block endpoint. The generator must never write
-physical outputs, inputs, markers, timers, counters, or application/control
-blocks. The gateway remains read-only. No PLC writes are allowed until the
-dedicated DBs have been verified, backed up, reserved, and the explicit write
-gate in the integration guide is passed.
+1. OB1 calls FB300 and FB310 cyclically.
+2. FB300 generates synthetic CCM process values and is the sole writer of DB300.
+3. FB310 updates diagnostic counters and heartbeat and is the sole writer of DB310.
+4. The Ubuntu Level-2 S7 gateway reads DB300/DB310 only; it has no PLC write path.
+5. The historian and System Map display these values with provenance
+   `RND_PLC_TEST`, never `REAL_S7` or actual plant measurements.
+
+The old Ubuntu writer remains available for offline dry-run/packing tests and
+read-only DB backup. Its physical write mode is deliberately blocked in the
+PLC-native architecture so that there cannot be two competing writers.
 
 ## Confirmed hardware and endpoint
 
@@ -28,163 +28,142 @@ gate in the integration guide is passed.
 | CPU firmware | `V4.5.5` |
 | Ethernet CP | 1 x CP 443-1 |
 | CP order number | `6GK7443-1EX20-0XE0` |
-| IP endpoint currently tested | `192.168.1.10:102` |
+| IP endpoint tested | `192.168.1.10:102` |
 | Rack / slot used by Snap7 | `0 / 3` |
 | Transport | S7 communication over ISO-on-TCP |
 | I/O cards | User reports no I/O cards; CPU and communication hardware only |
 
-The CP firmware and hardware revision have **not** yet been read from the module
-diagnostics. The address `192.168.1.10` is treated as the tested S7 endpoint;
-verify that it is the CP interface address before relying on any CP web
-diagnostics.
+The CP firmware and hardware revision have not been read from module
+diagnostics. The endpoint is reachable by ping and TCP/102 and Snap7 can
+establish an S7 connection. This does not prove the CPU is healthy or that
+engineering/download services are available.
 
-The presence of one CPU 417-4H does not establish a complete redundant S7-400H
-pair. Do not configure or commission this as a redundant H-system without
-evidence of the second CPU, synchronization links, and the complete H-system
-topology.
+The CPU previously showed STOP (yellow) and EXTF (red). The CP 443-1 was
+reported with INTF (red) and STOP (yellow). Snap7 CPU-info, CPU-state and
+protection diagnostics were rejected with service-not-implemented/object-
+not-found errors. These faults are unresolved. **Do not attempt MRES, switch
+to RUN, change hardware configuration, or download blocks while they remain
+unexplained.** A qualified Siemens PLC engineer must inspect the diagnostic
+buffer and rack.
 
-## Relevant repository findings
+The presence of one CPU 417-4H does not establish a complete redundant
+S7-400H pair. Do not treat it as a complete H-system without evidence of the
+second CPU, synchronization links and complete topology.
 
-- `backend/plc_simulators/ccm_simulator.py` contains the existing correlated
-  CCM process profile with PREPARE, START_CAST, STEADY_CAST, and END_CAST stages.
-- `backend/plc_simulators/ccm_s7_writer.py` reuses that process model and
-  packs its values into the proposed DB300/DB310 byte layout. Its default mode
-  is dry-run; PLC writes require an explicit command-line switch and a separate
-  DB-layout acknowledgement.
-- `backend/plc_simulators/s7_address_map.json` contains a simulation-only
-  CCM map. It is **not** a verified physical PLC map and must not be mounted for
-  the physical CCM.
-- `backend/opcua_gateway/gateway.py` reads absolute S7 DB addresses and
-  publishes them to the central OPC UA namespace. It has no write path.
-- The CCM R&D Compose overlay redirects only the CCM gateway client to the
-  physical endpoint; EAF and LF remain on their existing simulators.
-- CCM historian samples must carry `source_kind=RND_PLC_TEST`.
+## Source block inventory
 
-## Proposed S7 data contract (not yet verified on the physical CPU)
+| Block | Purpose |
+|---|---|
+| OB1 | Cyclic entry point |
+| FB300 / DB301 | Scan-driven synthetic CCM process profile |
+| DB300 | 48-byte process data contract |
+| FB310 / DB311 | Scan counter and heartbeat diagnostics |
+| DB310 | 12-byte diagnostic contract |
+| FC300 | Numeric range clamp |
 
-The writer expects two existing, dedicated, non-optimized absolute-address
-data blocks. These offsets are a proposal for the R&D data contract, not an
-assertion that the DBs currently exist or are safe to overwrite.
+The source order is deliberate: shared DBs and FC300 precede their callers;
+OB1 is last. The S7-SCL compiler creates the FB instance DBs for the calls in
+OB1. Confirm the generated block list after offline compilation.
 
-### DB300 — CCM process data (48 bytes)
+## Data contract
 
-| Offset | Tag | S7 type | Unit / meaning |
-|---:|---|---|---|
-| DBD0 | CastingSpeed | REAL | m/min |
-| DBD4 | TundishTemperature | REAL | degC |
-| DBD8 | MoldLevelPercent | REAL | % |
-| DBD12 | TundishWeightTon | REAL | t |
-| DBD16 | MoldCoolingWaterFlowM3h | REAL | m3/h |
-| DBD20 | MoldCoolingWaterDeltaC | REAL | degC |
-| DBD24 | SecondaryCoolingFlowM3h | REAL | m3/h |
-| DBD28 | OscillationFrequencyCpm | REAL | cycles/min |
-| DBD32 | StopperPositionPercent | REAL | % |
-| DBW36 | StageCode | INT | 0=IDLE, 1=PREPARE, 2=START_CAST, 3=STEADY_CAST, 4=END_CAST |
-| DBD40 | HeatNumber | DINT | synthetic heat number |
-| DBB44 | StatusFlags | BYTE | bit 0 Ready, 1 Running, 2 Fault, 3 CastingActive, 4 CoolingWaterOK, 5 MoldLevelControlOK, 6 EmergencyStopOK, 7 InterlockOK |
-| DBW46 | AlarmCode | INT | 0=none, 301=low cooling water, 302=mold level, 303=E-stop chain, 304=high tundish temperature |
+The exact proposed standard absolute-address layouts are documented in
+[plc/s7_400h_ccm_rnd/DB_LAYOUT.md](../../plc/s7_400h_ccm_rnd/DB_LAYOUT.md).
+The layouts are not verified on the physical CPU until the source is compiled,
+the resulting DBs are inspected, and the DBs are read back from the CPU.
 
-### DB310 — diagnostics (12 bytes)
+- DB300: 48 bytes, process values, stage, heat number, status flags and alarm.
+- DB310: 12 bytes, scan counter, unmeasured-cycle-time sentinel and status bits.
 
-| Offset | Tag | S7 type | Meaning |
-|---:|---|---|---|
-| DBD0 | ScanCounter | DINT | incrementing Ubuntu generator counter |
-| DBD4 | CycleTimeMs | REAL | measured generator cycle time |
-| DBX8.0 | WatchdogOK | BOOL | generator loop within its cycle budget |
-| DBX8.1 | CommsOK | BOOL | writer is in PLC-write mode |
-| DBX8.2 | Heartbeat | BOOL | toggles every five generator cycles |
-
-The proposed DB layout intentionally differs from the older simulation-only
-map. The physical gateway map must be created separately and must match the
-verified DB layout exactly.
+Do not use the old simulation-only map at
+`backend/plc_simulators/s7_address_map.json` as the physical map. A separately
+reviewed physical CCM map must match the compiled DBs exactly.
 
 ## Synthetic process behavior
 
-The generator runs on Ubuntu and reuses the project's CCM process model:
+FB300 cycles through:
 
-1. IDLE: casting speed and oscillation are zero.
-2. PREPARE: initialize the synthetic heat and simulated permissives.
-3. START_CAST: ramp speed, oscillation, stopper position, and water flows.
-4. STEADY_CAST: hold casting speed near target with bounded oscillations;
-   tundish weight decreases with time; mold level remains controlled.
-5. END_CAST: ramp down speed and oscillation and reduce tundish weight.
+1. IDLE
+2. PREPARE
+3. START_CAST
+4. STEADY_CAST
+5. END_CAST
 6. Return to IDLE and increment the synthetic heat number.
 
-Fault injection is disabled by default and restricted to explicit R&D test
-modes. Simulated faults only affect test values and alarms. They never drive
-physical outputs.
+The sequence is scan-count based. Wall-clock stage duration depends on the
+actual OB1 scan time and is not a real-time guarantee. The source does not
+claim a measured OB1 cycle time; DB310.CycleTimeMs remains zero to mean
+"not measured".
 
-## Commissioning gates
+The status/permissive bits are synthetic demonstration values only. In
+particular, EmergencyStopOK and InterlockOK are not connected to physical
+safety circuits and must never be used as real safety indications.
 
-### Gate 0 — read-only identification
+## Mandatory commissioning gates
 
-- Confirm the CP interface IP and TCP/102 reachability.
-- Read CPU/CP identification, firmware, hardware revision, diagnostic buffer,
-  and protection/access settings using available read-only diagnostics.
-- Do not infer that successful TCP connection means DB read/write access is
-  enabled.
+### Gate 0 — resolve hardware faults and preserve the station
 
-### Gate 1 — read-only DB verification and backup
+- Have a qualified Siemens PLC engineer inspect the CPU and CP diagnostic
+  buffers, power supply, rack, CP configuration and actual hardware topology.
+- Resolve the CPU STOP/EXTF and CP INTF indications before programming.
+- Confirm the exact STEP 7 / S7-SCL engineering version supports the CPU
+  order number and firmware.
+- Obtain a complete upload/backup of the existing STEP 7 station and all
+  accessible blocks. A Snap7 byte-range DB backup is not a station backup.
+- Do not MRES, erase memory, force RUN or download until a recovery plan and
+  the existing station backup are confirmed.
 
-- Confirm DB300 and DB310 are intended for this R&D test and are not used by
-  an existing application.
-- Run the writer's `--backup-only` mode. It reads only DB300 bytes 0–47 and
-  DB310 bytes 0–11 and saves the raw data, hex, and SHA-256 hashes on Ubuntu.
-- Verify the actual DB sizes, offsets, data types, and reservation independently.
-  The backup is only a byte-range backup, not a complete STEP 7 project or
-  station backup.
-- If either DB is missing, inaccessible, protected, or not dedicated to this
-  R&D test, stop. Snap7 cannot create Siemens DB blocks or compile PLC code.
-  Provisioning missing DBs requires a suitable Siemens engineering tool or
-  another verified engineering process.
+### Gate 1 — offline compile only
 
-### Gate 2 — offline generator validation
+- Import `plc/s7_400h_ccm_rnd/CCM_RND.scl` into an S7-SCL source folder in a
+  compatible STEP 7 Classic project.
+- Compile offline. Resolve every compiler diagnostic; do not assume that
+  source text is compiled just because it is committed to GitHub.
+- Confirm that the compiler generated OB1, FB300, FB310, FC300, DB300, DB310,
+  and instance DB301/DB311.
+- Inspect DB300 and DB310 byte offsets, lengths, data types and standard
+  (non-optimized) access against DB_LAYOUT.md.
+- Review the hardware configuration and complete block set with the
+  responsible PLC engineer.
 
-- Run the writer in its default dry-run mode. It must not connect to the PLC.
-- Verify the generated DB300 and DB310 byte layouts against this document and
-  the planned physical gateway map.
-- Confirm all values are finite, within expected engineering ranges, and
-  internally consistent.
-- Keep fault injection disabled for initial commissioning.
+### Gate 2 — controlled download and read-back
 
-### Gate 3 — explicitly approved DB writes
+- Proceed only after Gate 0 and Gate 1 are formally complete and explicitly
+  approved by the responsible PLC engineer.
+- Download only the reviewed application blocks during a controlled R&D
+  maintenance session with a verified recovery path.
+- Do not overwrite the hardware configuration or erase the CPU as a shortcut.
+- Keep the CPU in the engineer-approved operating state.
+- Read DB300 and DB310 back with Snap7; verify exact lengths, offsets and
+  plausible synthetic values before enabling the Level-2 reader.
 
-- Confirm the DB backup exists on the Ubuntu host.
-- Confirm DB300 and DB310 are dedicated, correct, and safe to overwrite.
-- Set the exact DB-layout acknowledgement and invoke the writer with
-  `--enable-plc-writes`.
-- The writer repeats the read-only preflight and saves another pre-write backup
-  before writing.
-- Write only DB300 bytes 0–47 and DB310 bytes 0–11. Never write to any other
-  PLC area.
-- Start with a one-shot write, verify via an independent read-only probe, and
-  only then consider continuous generation.
+### Gate 3 — isolated Level-2 integration
 
-### Gate 4 — isolated Level-2 integration
-
-- Use the dedicated CCM R&D Compose overlay; do not modify normal startup or
-  EAF/LF simulator configuration.
+- Use the dedicated CCM R&D Compose overlay; normal startup remains unchanged.
+- Redirect only the CCM S7 gateway client to the verified physical endpoint
+  and the separately reviewed full address map.
 - Keep EAF and LF on their existing simulators.
-- Configure only the CCM S7 client to use the physical endpoint, rack 0,
-  slot 3, and a separately reviewed full address map.
-- Store CCM samples with `RND_PLC_TEST` provenance, never `REAL_S7`.
+- Keep the gateway read-only.
+- Store CCM historian samples with `source_kind=RND_PLC_TEST`.
 - Mark the CCM R&D node active only after all 25 logical CCM tags have fresh,
-  GOOD-quality historian samples with the expected provenance.
-- Preserve immediate rollback by returning to the base simulator Compose file.
+  GOOD-quality samples with the expected provenance.
+- Preserve immediate rollback by returning to the base simulator Compose
+  configuration.
 
-## Immediate next actions
+## Current status
 
-1. Run the Ubuntu writer in dry-run mode to validate the synthetic model and
-   byte packing without connecting to the PLC.
-2. Run `--backup-only` to test read access to DB300/DB310 and preserve their
-   current byte ranges.
-3. Verify that both DBs are dedicated to this R&D purpose and that the
-   proposed offsets match the physical data blocks.
-4. Do not enable writes until those checks are complete and the operator
-   explicitly approves the write stage.
+- Dry-run Python CCM process generator: passed.
+- TCP/102 reachability and Snap7 connection: passed.
+- DB300 and DB310 read: failed because the blocks do not exist.
+- Snap7 block inventory: OB=0, FB=0, FC=0, DB=0; system blocks reported.
+- CPU STOP/EXTF and CP INTF indications: unresolved.
+- Siemens SCL source: committed as source only; not compiled or downloaded.
+- Physical DB layout: not yet verified.
+- Level-2 physical CCM gateway activation: not authorized yet.
 
-## Siemens references
+## Siemens language reference
 
-- [S7-400H System Manual](https://cache.industry.siemens.com/dl/files/523/1186523/att_42086/v1/s7_400h_de_de-DE.pdf) — CPU 417-4H family and engineering context.
-- [CP 443-1 EX20 Manual](https://cache.industry.siemens.com/dl/files/386/27013386/att_63884/v1/GH_CP443-1-EX20_76.pdf) — order number, firmware variants, and engineering compatibility.
-- [Siemens S7 CPs for Industrial Ethernet reference](https://support.industry.siemens.com/cs/attachments/56699406/hy_S7-CPs-IE_76.pdf) — CP 443-1 EX20 module characteristics.
+The source follows the S7-SCL language structure for S7-300/S7-400 documented
+in the Siemens SIMATIC S7-SCL V5.3 manual, including DB declarations, FB
+instances, FCs, OB declarations and SCL block-call syntax:
+https://cache.industry.siemens.com/dl/files/793/5581793/att_66783/v1/SCL_e.pdf

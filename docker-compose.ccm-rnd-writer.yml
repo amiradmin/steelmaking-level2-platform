@@ -1,0 +1,29 @@
+# Standalone opt-in Ubuntu CCM R&D writer.
+#
+# This file intentionally does not include or reconfigure the Level-2 gateway.
+# Default invocation is dry-run; PLC writes require --enable-plc-writes plus
+# the exact DB-layout acknowledgement and a successful pre-write backup.
+services:
+  ccm-rnd-s7-writer:
+    profiles:
+      - ccm-rnd-writer
+    build:
+      context: ./backend/plc_simulators
+    container_name: steelmaking-level2-ccm-rnd-s7-writer
+    command: ["python", "ccm_s7_writer.py"]
+    restart: "no"
+    environment:
+      CCM_RND_PLC_HOST: ${CCM_RND_PLC_HOST:-192.168.1.10}
+      CCM_RND_PLC_PORT: ${CCM_RND_PLC_PORT:-102}
+      CCM_RND_PLC_RACK: ${CCM_RND_PLC_RACK:-0}
+      CCM_RND_PLC_SLOT: ${CCM_RND_PLC_SLOT:-3}
+      CCM_RND_SCAN_SECONDS: ${CCM_RND_SCAN_SECONDS:-1.0}
+      CCM_RND_DB_LAYOUT_ACK: ${CCM_RND_DB_LAYOUT_ACK:-}
+      CCM_RND_BACKUP_DIR: /backups
+      PLC_SIM_EPOCH_UNIX: ${PLC_SIM_EPOCH_UNIX:-1788220800}
+      PLC_SIM_TIME_SCALE: ${PLC_SIM_TIME_SCALE:-60}
+      PLC_SIM_HEAT_BASE: ${PLC_SIM_HEAT_BASE:-260001}
+      PLC_SIM_HEAT_PITCH_MINUTES: ${PLC_SIM_HEAT_PITCH_MINUTES:-70}
+      PLC_SIM_FAULT_MODE: ${CCM_PLC_SIM_FAULT_MODE:-NONE}
+    volumes:
+      - ./data/ccm-rnd-plc-backups:/backups

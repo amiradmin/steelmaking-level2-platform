@@ -79,8 +79,9 @@ docker compose -f docker-compose.yml -f docker-compose.ccm-rnd.yml logs --tail=1
 
 Check the System Map at `http://127.0.0.1/#/system-map`. The CCM R&D PLC node
 must not show verified/online telemetry merely because TCP/102 is reachable.
-It is considered active only when the latest CCM sample is fresh, has
-`source_kind=RND_PLC_TEST`, and has GOOD OPC UA quality.
+It is considered active only when all 25 mapped logical CCM tags have fresh
+samples in the last five seconds, each has `source_kind=RND_PLC_TEST`, and each
+has GOOD OPC UA quality.
 
 Inspect provenance in TimescaleDB:
 

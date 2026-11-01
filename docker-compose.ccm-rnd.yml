@@ -1,9 +1,9 @@
 # Opt-in CCM R&D profile.
 #
 # This overlay redirects ONLY the CCM gateway client to the dedicated physical
-# S7-400H. EAF and LF remain on their existing simulators. A separately reviewed
-# full gateway map is mandatory; the simulation-only map is never accepted as a
-# fallback for the physical CCM.
+# S7-400H. EAF and LF remain on their existing simulators. The gateway is
+# read-only. The separate Ubuntu writer is opt-in, starts in dry-run mode, and
+# can write only the explicitly reserved DB300/DB310 ranges after two guards.
 services:
   central-opcua-server:
     environment:
@@ -12,14 +12,12 @@ services:
       CCM_PLC_RACK: ${CCM_RND_PLC_RACK:-0}
       CCM_PLC_SLOT: ${CCM_RND_PLC_SLOT:-3}
       OPCUA_GATEWAY_MAP_PATH: /app/s7_address_map.ccm-rnd.json
-      # EAF/LF simulators may remain connected while CCM is being commissioned.
       OPCUA_GATEWAY_REQUIRE_ALL_PLC: "0"
     volumes:
       - "${CCM_RND_S7_ADDRESS_MAP_FILE:?Set CCM_RND_S7_ADDRESS_MAP_FILE to a reviewed full S7 map}:/app/s7_address_map.ccm-rnd.json:ro"
 
   plc-ingestor-central-test:
     environment:
-      # Explicitly prevent CCM from being mislabeled as REAL_S7.
       PLC_REAL_AREAS: ""
       PLC_SOURCE_KIND_OVERRIDES_JSON: '{"CCM":"RND_PLC_TEST"}'
 
@@ -30,3 +28,24 @@ services:
       CCM_PLC_PORT: ${CCM_RND_PLC_PORT:-102}
       CCM_PLC_RACK: ${CCM_RND_PLC_RACK:-0}
       CCM_PLC_SLOT: ${CCM_RND_PLC_SLOT:-3}
+
+  ccm-rnd-s7-writer:
+    profiles:
+      - ccm-rnd-writer
+    build:
+      context: ./backend/plc_simulators
+    container_name: steelmaking-level2-ccm-rnd-s7-writer
+    command: ["python", "ccm_s7_writer.py"]
+    restart: "no"
+    environment:
+      CCM_RND_PLC_HOST: ${CCM_RND_PLC_HOST:-192.168.1.10}
+      CCM_RND_PLC_PORT: ${CCM_RND_PLC_PORT:-102}
+      CCM_RND_PLC_RACK: ${CCM_RND_PLC_RACK:-0}
+      CCM_RND_PLC_SLOT: ${CCM_RND_PLC_SLOT:-3}
+      CCM_RND_SCAN_SECONDS: ${CCM_RND_SCAN_SECONDS:-1.0}
+      CCM_RND_DB_LAYOUT_ACK: ${CCM_RND_DB_LAYOUT_ACK:-}
+      PLC_SIM_EPOCH_UNIX: ${PLC_SIM_EPOCH_UNIX:-1788220800}
+      PLC_SIM_TIME_SCALE: ${PLC_SIM_TIME_SCALE:-60}
+      PLC_SIM_HEAT_BASE: ${PLC_SIM_HEAT_BASE:-260001}
+      PLC_SIM_HEAT_PITCH_MINUTES: ${PLC_SIM_HEAT_PITCH_MINUTES:-70}
+      PLC_SIM_FAULT_MODE: ${CCM_PLC_SIM_FAULT_MODE:-NONE}

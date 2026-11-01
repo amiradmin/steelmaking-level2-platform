@@ -40,6 +40,35 @@ REAL_AREAS: Final = frozenset(
     for part in os.getenv("PLC_REAL_AREAS", "").split(",")
     if part.strip()
 )
+SOURCE_KIND_OVERRIDES_RAW: Final = os.getenv("PLC_SOURCE_KIND_OVERRIDES_JSON", "{}").strip()
+
+
+def load_source_kind_overrides() -> dict[str, str]:
+    """Load explicit per-area provenance labels without changing default behavior."""
+    try:
+        raw = json.loads(SOURCE_KIND_OVERRIDES_RAW or "{}")
+    except json.JSONDecodeError as exc:
+        raise ConfigurationError("PLC_SOURCE_KIND_OVERRIDES_JSON is not valid JSON") from exc
+    if not isinstance(raw, dict):
+        raise ConfigurationError("PLC_SOURCE_KIND_OVERRIDES_JSON must be a JSON object")
+
+    allowed = {"OPCUA", "REAL_S7", "RND_PLC_TEST"}
+    overrides: dict[str, str] = {}
+    for area, source_kind in raw.items():
+        normalized_area = str(area).strip().upper()
+        normalized_kind = str(source_kind).strip().upper()
+        if not normalized_area:
+            raise ConfigurationError("Source-kind override area cannot be empty")
+        if normalized_kind not in allowed:
+            raise ConfigurationError(
+                f"Unsupported source kind {source_kind!r} for area {normalized_area}; "
+                f"allowed values are {sorted(allowed)}"
+            )
+        overrides[normalized_area] = normalized_kind
+    return overrides
+
+
+SOURCE_KIND_OVERRIDES: Final = load_source_kind_overrides()
 
 
 class ConfigurationError(RuntimeError):
@@ -171,8 +200,11 @@ def source_area(tag_name: str) -> str:
 
 
 def source_kind_for_tag(tag_name: str) -> str:
-    """Mark only explicitly configured physical PLC areas as REAL_S7."""
-    return "REAL_S7" if source_area(tag_name) in REAL_AREAS else SAMPLE_SOURCE_KIND
+    """Resolve provenance with explicit per-area overrides taking precedence."""
+    area = source_area(tag_name)
+    if area in SOURCE_KIND_OVERRIDES:
+        return SOURCE_KIND_OVERRIDES[area]
+    return "REAL_S7" if area in REAL_AREAS else SAMPLE_SOURCE_KIND
 
 
 def write_sample(

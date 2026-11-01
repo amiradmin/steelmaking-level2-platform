@@ -93,7 +93,9 @@ def _latest_controller_samples() -> dict[str, dict[str, Any]]:
                 MAX(ps.ts) AS last_sample_at,
                 COUNT(*) FILTER (
                     WHERE ps.ts >= NOW() - (%s * INTERVAL '1 second')
-                ) AS samples_last_window
+                ) AS samples_last_window,
+                (ARRAY_AGG(ps.attributes ->> 'source_kind' ORDER BY ps.ts DESC))[1]
+                    AS latest_source_kind
             FROM process_samples ps
             JOIN process_tags pt ON pt.id = ps.tag_id
             WHERE pt.tag_name LIKE 'EAF.%%'
@@ -106,10 +108,11 @@ def _latest_controller_samples() -> dict[str, dict[str, Any]]:
         rows = cursor.fetchall()
 
     result = {"eaf": {}, "lf": {}, "ccm": {}}
-    for controller, last_sample_at, sample_count in rows:
+    for controller, last_sample_at, sample_count, latest_source_kind in rows:
         result[str(controller)] = {
             "last_sample_at": last_sample_at,
             "samples_last_window": int(sample_count),
+            "latest_source_kind": latest_source_kind,
         }
     return result
 
@@ -162,11 +165,21 @@ def live_system_map(request: Request) -> Response:
     opcua_last_sample = _latest_opcua_sample()
     heat_management_online = _service_health("http://heat-management:9000/health")
 
-    real_plc_host = os.getenv("REAL_PLC_HOST", "192.168.1.10").strip() or "192.168.1.10"
-    real_plc_port = _env_int("REAL_PLC_PORT", 102)
-    real_plc_rack = _env_int("REAL_PLC_RACK", 0)
-    real_plc_slot = _env_int("REAL_PLC_SLOT", 3)
+    ccm_source_mode = os.getenv("CCM_PLC_SOURCE_MODE", "SIMULATOR").strip().upper()
+    ccm_rnd_configured = ccm_source_mode == "RND_PLC_TEST"
+    real_plc_host = (
+        os.getenv("CCM_PLC_HOST", "192.168.1.10").strip()
+        if ccm_rnd_configured
+        else os.getenv("REAL_PLC_HOST", "192.168.1.10").strip()
+    ) or "192.168.1.10"
+    real_plc_port = _env_int("CCM_PLC_PORT" if ccm_rnd_configured else "REAL_PLC_PORT", 102)
+    real_plc_rack = _env_int("CCM_PLC_RACK" if ccm_rnd_configured else "REAL_PLC_RACK", 0)
+    real_plc_slot = _env_int("CCM_PLC_SLOT" if ccm_rnd_configured else "REAL_PLC_SLOT", 3)
     real_plc_online = _tcp_reachable(real_plc_host, real_plc_port)
+    ccm_telemetry = controllers.get("ccm", {})
+    ccm_source_kind = ccm_telemetry.get("latest_source_kind")
+    ccm_rnd_sample_fresh = _status_from_timestamp(ccm_telemetry.get("last_sample_at")) == "online"
+    ccm_rnd_active = ccm_rnd_configured and ccm_source_kind == "RND_PLC_TEST" and ccm_rnd_sample_fresh
 
     controller_config = {
         "eaf": (
@@ -180,7 +193,7 @@ def live_system_map(request: Request) -> Response:
             _env_int("LF_PLC_PORT", 102),
         ),
         "ccm": (
-            "CCM PLC / S7-400",
+            "CCM R&D PLC / S7-400H" if ccm_rnd_configured else "CCM PLC / S7-400",
             os.getenv("CCM_PLC_HOST", "ccm-plc-simulator").strip() or "ccm-plc-simulator",
             _env_int("CCM_PLC_PORT", 102),
         ),
@@ -191,13 +204,26 @@ def live_system_map(request: Request) -> Response:
         telemetry = controllers[controller_id]
         last_sample = telemetry.get("last_sample_at")
         sample_count = telemetry.get("samples_last_window", 0)
+        controller_status = _status_from_timestamp(last_sample)
+        controller_detail = f"{sample_count} samples in the last {int(FRESH_AFTER_SECONDS)} s"
+        if controller_id == "ccm" and ccm_rnd_configured:
+            controller_status = (
+                "online" if ccm_rnd_active
+                else "degraded" if real_plc_online
+                else "offline"
+            )
+            controller_detail = (
+                f"{sample_count} fresh RND_PLC_TEST samples"
+                if ccm_rnd_active
+                else "Waiting for fresh CCM RND_PLC_TEST samples from the physical PLC"
+            )
         controller_nodes.append(
             _node(
                 controller_id,
                 label,
                 "Level 1 controller",
-                _status_from_timestamp(last_sample),
-                f"{sample_count} samples in the last {int(FRESH_AFTER_SECONDS)} s",
+                controller_status,
+                controller_detail,
                 last_sample,
                 host=host,
                 port=port,
@@ -209,10 +235,23 @@ def live_system_map(request: Request) -> Response:
         *controller_nodes,
         _node(
             "real-plc",
-            "REAL PLC / CPU 417-4H",
+            "CCM R&D PLC / CPU 417-4H" if ccm_rnd_configured else "REAL PLC / CPU 417-4H",
             f"Siemens S7-400H · Rack {real_plc_rack} / Slot {real_plc_slot}",
-            "online" if real_plc_online else "offline",
-            "READ ONLY · TCP/102 reachable" if real_plc_online else "READ ONLY · waiting for TCP/102",
+            (
+                "online" if ccm_rnd_active
+                else "degraded" if real_plc_online
+                else "offline"
+            ) if ccm_rnd_configured else ("online" if real_plc_online else "offline"),
+            (
+                "READ ONLY · fresh RND_PLC_TEST telemetry verified"
+                if ccm_rnd_active
+                else "READ ONLY · TCP/102 reachable; waiting for RND telemetry"
+                if real_plc_online
+                else "READ ONLY · waiting for TCP/102"
+            ) if ccm_rnd_configured else (
+                "READ ONLY · TCP/102 reachable" if real_plc_online
+                else "READ ONLY · waiting for TCP/102"
+            ),
             host=real_plc_host,
             port=real_plc_port,
         ),
@@ -289,11 +328,38 @@ def live_system_map(request: Request) -> Response:
             "fresh_after_seconds": FRESH_AFTER_SECONDS,
             "nodes": nodes,
             "flows": [
-                {"from": controller_id, "to": "opcua-gateway", "status": controllers[controller_id] and _status_from_timestamp(controllers[controller_id].get("last_sample_at")) or "offline", "label": "PLC telemetry"}
+                {
+                    "from": controller_id,
+                    "to": "opcua-gateway",
+                    "status": (
+                        "online" if ccm_rnd_active else "degraded" if real_plc_online else "offline"
+                    ) if controller_id == "ccm" and ccm_rnd_configured else (
+                        controllers[controller_id]
+                        and _status_from_timestamp(controllers[controller_id].get("last_sample_at"))
+                        or "offline"
+                    ),
+                    "label": (
+                        "RND_PLC_TEST telemetry" if controller_id == "ccm" and ccm_rnd_configured
+                        else "PLC telemetry"
+                    ),
+                }
                 for controller_id in ("eaf", "lf", "ccm")
-            ]
-            + [
-                {"from": "real-plc", "to": "opcua-gateway", "status": "idle", "label": "standby / read-only"},
+                if not (controller_id == "ccm" and ccm_rnd_configured)
+            ] + (
+                [{
+                    "from": "real-plc",
+                    "to": "opcua-gateway",
+                    "status": "online" if ccm_rnd_active else "degraded" if real_plc_online else "offline",
+                    "label": "RND_PLC_TEST · read-only",
+                }]
+                if ccm_rnd_configured
+                else [{
+                    "from": "real-plc",
+                    "to": "opcua-gateway",
+                    "status": "idle",
+                    "label": "standby / read-only",
+                }]
+            ) + [
                 {"from": "opcua-gateway", "to": "plc-ingestor", "status": opcua_status, "label": "OPC UA"},
                 {"from": "plc-ingestor", "to": "historian", "status": opcua_status, "label": "normalized samples"},
                 {"from": "historian", "to": "heat-management", "status": "online" if heat_management_online else "offline", "label": "heat events"},

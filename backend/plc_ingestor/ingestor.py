@@ -25,6 +25,7 @@ LOGGER = logging.getLogger("plc-ingestor")
 class ConfigurationError(RuntimeError):
     """Raised when PLC ingestion configuration is incomplete or invalid."""
 
+
 DB_HOST: Final = os.getenv("DB_HOST", "historian-db")
 DB_PORT: Final = int(os.getenv("DB_PORT", "5432"))
 DB_NAME: Final = os.getenv("POSTGRES_DB", "steelmaking_level2")

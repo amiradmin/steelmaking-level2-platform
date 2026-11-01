@@ -97,7 +97,12 @@ def _latest_controller_samples() -> dict[str, dict[str, Any]]:
                 (ARRAY_AGG(ps.attributes ->> 'source_kind' ORDER BY ps.ts DESC))[1]
                     AS latest_source_kind,
                 (ARRAY_AGG(ps.quality::text ORDER BY ps.ts DESC))[1]
-                    AS latest_quality
+                    AS latest_quality,
+                COUNT(DISTINCT pt.tag_name) FILTER (
+                    WHERE ps.ts >= NOW() - (%s * INTERVAL '1 second')
+                      AND ps.quality::text = 'GOOD'
+                      AND ps.attributes ->> 'source_kind' = 'RND_PLC_TEST'
+                ) AS good_rnd_tags_last_window
             FROM process_samples ps
             JOIN process_tags pt ON pt.id = ps.tag_id
             WHERE pt.tag_name LIKE 'EAF.%%'
@@ -105,17 +110,25 @@ def _latest_controller_samples() -> dict[str, dict[str, Any]]:
                OR pt.tag_name LIKE 'CCM.%%'
             GROUP BY 1
             """,
-            [FRESH_AFTER_SECONDS],
+            [FRESH_AFTER_SECONDS, FRESH_AFTER_SECONDS],
         )
         rows = cursor.fetchall()
 
     result = {"eaf": {}, "lf": {}, "ccm": {}}
-    for controller, last_sample_at, sample_count, latest_source_kind, latest_quality in rows:
+    for (
+        controller,
+        last_sample_at,
+        sample_count,
+        latest_source_kind,
+        latest_quality,
+        good_rnd_tags_last_window,
+    ) in rows:
         result[str(controller)] = {
             "last_sample_at": last_sample_at,
             "samples_last_window": int(sample_count),
             "latest_source_kind": latest_source_kind,
             "latest_quality": latest_quality,
+            "good_rnd_tags_last_window": int(good_rnd_tags_last_window or 0),
         }
     return result
 
@@ -185,7 +198,7 @@ def live_system_map(request: Request) -> Response:
     ccm_rnd_active = (
         ccm_rnd_configured
         and ccm_source_kind == "RND_PLC_TEST"
-        and ccm_telemetry.get("latest_quality") == "GOOD"
+        and ccm_telemetry.get("good_rnd_tags_last_window", 0) >= 25
         and ccm_rnd_sample_fresh
     )
 

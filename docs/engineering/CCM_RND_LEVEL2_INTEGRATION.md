@@ -21,7 +21,10 @@ or any DB other than DB300 and DB310.
    proposed layout is documented in
    `docs/engineering/CCM_RND_PLC_COMMISSIONING.md`; it is not evidence that
    either DB currently exists.
-4. Back up the existing PLC data/application before enabling writes.
+4. Back up the existing DB300 and DB310 byte ranges before enabling writes.
+   The writer saves these raw ranges under
+   `data/ccm-rnd-plc-backups/` before its first write. This is a data-block
+   backup only, not a complete STEP 7 station or program backup.
 5. If either DB is missing, inaccessible, protected, or not reserved, STOP.
    Snap7 can write bytes into an existing accessible DB; it cannot create a
    Siemens DB block or compile a PLC program.
@@ -66,20 +69,39 @@ docker compose -f docker-compose.yml -f docker-compose.ccm-rnd.yml \
 This imports the existing CCM process model and packs DB300/DB310 bytes, but
 does not connect to the PLC. Review the output before moving to the next stage.
 
-## Stage 2 — explicit write enable (only after DB verification)
+## Stage 2 — read-only DB backup and verification
 
-First perform a read-only DB probe using the verified map. Confirm that the
-actual online DB300 and DB310 match the documented offsets, sizes, and data
-types, and that both are dedicated to this R&D writer. Preserve the backup.
+After confirming that DB300/DB310 are intended for this R&D test, run:
 
-Only after those checks and explicit operator approval, set this local
-`.env` value:
+```bash
+mkdir -p data/ccm-rnd-plc-backups
+
+docker compose -f docker-compose.yml -f docker-compose.ccm-rnd.yml \
+  --profile ccm-rnd-writer run --rm ccm-rnd-s7-writer \
+  python ccm_s7_writer.py --backup-only
+
+ls -lh data/ccm-rnd-plc-backups/
+```
+
+This connects to the PLC and reads only the first 48 bytes of DB300 and first
+12 bytes of DB310. It writes a timestamped JSON backup to the host directory.
+It does not modify the PLC. If either DB read fails, do not proceed.
+
+The JSON contains raw bytes, hex, and SHA-256 hashes. It is not a full PLC
+application backup and does not establish that the offsets are semantically
+correct. Verify the layout independently before proceeding.
+
+## Stage 3 — explicit write enable
+
+Only after confirming that DB300 and DB310 exist, are correctly laid out,
+are reserved for this R&D generator, and have a saved pre-write backup, set
+this local `.env` value:
 
 ```dotenv
 CCM_RND_DB_LAYOUT_ACK=DB300_48_DB310_12_VERIFIED_AND_RESERVED
 ```
 
-Then run the writer with the explicit write switch:
+Then run one explicitly armed sample:
 
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.ccm-rnd.yml \
@@ -87,15 +109,16 @@ docker compose -f docker-compose.yml -f docker-compose.ccm-rnd.yml \
   python ccm_s7_writer.py --enable-plc-writes --once
 ```
 
-The writer first reads DB300 (48 bytes) and DB310 (12 bytes), then writes only
-those two ranges. A successful one-shot write must be verified with an
-independent read-only probe before starting continuous generation.
+The writer repeats the read-only DB preflight and saves another pre-write
+backup before writing. It writes only DB300 bytes 0–47 and DB310 bytes 0–11.
+Verify the result with an independent read-only probe before starting
+continuous generation.
 
 For continuous generation, omit `--once` but retain
 `--enable-plc-writes`. Stop it with Ctrl+C. The writer container has no
 automatic restart policy.
 
-## Stage 3 — Level-2 read-only integration
+## Stage 4 — Level-2 read-only integration
 
 Create a full map file whose CCM entries match the verified physical layout.
 Keep EAF and LF entries pointed at their existing simulators. Then validate

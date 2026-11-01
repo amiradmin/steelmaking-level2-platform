@@ -1,0 +1,258 @@
+// ============================================================================
+ // CCM R&D demonstration application for Siemens S7-400 / S7-SCL V5.x
+ // Target family: S7-400H CPU 417-4H (engineering compatibility still to verify)
+ //
+ // SAFETY / SCOPE:
+ // - Standalone synthetic process demonstration only.
+ // - No peripheral inputs, outputs, markers, timers, counters or drive commands.
+ // - DB300 and DB310 are synthetic demonstration data only.
+ // - Do not compile/download until the actual CPU configuration, diagnostics,
+ //   block inventory, memory availability and engineering compatibility have
+ //   been reviewed by a qualified Siemens PLC engineer.
+ //
+ // DB300 is the public process-data contract (48 bytes).
+ // DB310 is the public diagnostics contract (12 bytes).
+ // FB300 and FB310 own these DBs. Do NOT run the Ubuntu DB writer at the same
+ // time; it would create competing writers.
+ //
+ // FB300 simulation timing is scan-count based, not a real-time guarantee.
+ // Tune the stage tick counts only after measuring the actual OB1 scan time.
+ // ============================================================================
+
+DATA_BLOCK DB300
+STRUCT
+    CastingSpeed                 : REAL := 0.0;       // DBD 0, m/min
+    TundishTemperature           : REAL := 1548.0;    // DBD 4, degC
+    MoldLevelPercent             : REAL := 55.0;      // DBD 8, %
+    TundishWeightTon             : REAL := 38.0;      // DBD 12, t
+    MoldCoolingWaterFlowM3h      : REAL := 925.0;     // DBD 16, m3/h
+    MoldCoolingWaterDeltaC       : REAL := 7.2;       // DBD 20, degC
+    SecondaryCoolingFlowM3h      : REAL := 520.0;     // DBD 24, m3/h
+    OscillationFrequencyCpm      : REAL := 0.0;       // DBD 28, cycles/min
+    StopperPositionPercent       : REAL := 0.0;       // DBD 32, %
+    StageCode                    : INT  := 0;         // DBW 36
+    ReservedWord38               : WORD := W#16#0000; // DBW 38, alignment/reserved
+    HeatNumber                   : DINT := 260001;    // DBD 40
+    StatusFlags                  : BYTE := B#16#F1;   // DBB 44
+    ReservedByte45               : BYTE := B#16#00;  // DBB 45, reserved
+    AlarmCode                    : INT  := 0;         // DBW 46
+END_STRUCT
+BEGIN
+:
+END_DATA_BLOCK
+
+
+DATA_BLOCK DB310
+STRUCT
+    ScanCounter                  : DINT := 0;         // DBD 0
+    CycleTimeMs                  : REAL := 0.0;       // DBD 4; 0 = not measured
+    StatusBits                   : BYTE := B#16#01;   // DBB 8: bit0 watchdog, bit1 comms, bit2 heartbeat
+    ReservedBytes                : ARRAY [0..2] OF BYTE;
+END_STRUCT
+BEGIN
+:
+END_DATA_BLOCK
+
+
+FUNCTION FC300 : REAL
+VAR_INPUT
+    Value                        : REAL;
+    Minimum                      : REAL;
+    Maximum                      : REAL;
+END_VAR
+BEGIN
+    IF Value < Minimum THEN
+        FC300 := Minimum;
+    ELSIF Value > Maximum THEN
+        FC300 := Maximum;
+    ELSE
+        FC300 := Value;
+    END_IF;
+END_FUNCTION
+
+
+FUNCTION_BLOCK FB300
+VAR
+    StageCode                    : INT := 0;
+    StageTick                    : DINT := 0;
+    HeatNumber                   : DINT := 260001;
+    StageRatio                   : REAL := 0.0;
+    SimCastingSpeed              : REAL := 0.0;
+    SimMoldLevel                 : REAL := 55.0;
+    SimTundishTemperature        : REAL := 1548.0;
+    SimTundishWeight             : REAL := 38.0;
+    SimOscillation               : REAL := 0.0;
+    SimStopperPosition           : REAL := 0.0;
+END_VAR
+BEGIN
+    // A bounded scan counter prevents signed DINT overflow.
+    IF StageTick < 2000000000 THEN
+        StageTick := StageTick + 1;
+    ELSE
+        StageTick := 0;
+    END_IF;
+
+    // Sequence: IDLE (100 scans), PREPARE (250), START (200),
+    // STEADY (2100), END (200), then next synthetic heat.
+    CASE StageCode OF
+        0:
+            IF StageTick >= 100 THEN
+                StageCode := 1;
+                StageTick := 0;
+            END_IF;
+        1:
+            IF StageTick >= 250 THEN
+                StageCode := 2;
+                StageTick := 0;
+            END_IF;
+        2:
+            IF StageTick >= 200 THEN
+                StageCode := 3;
+                StageTick := 0;
+            END_IF;
+        3:
+            IF StageTick >= 2100 THEN
+                StageCode := 4;
+                StageTick := 0;
+            END_IF;
+        4:
+            IF StageTick >= 200 THEN
+                StageCode := 0;
+                StageTick := 0;
+                IF HeatNumber < 2147483000 THEN
+                    HeatNumber := HeatNumber + 1;
+                ELSE
+                    HeatNumber := 260001;
+                END_IF;
+            END_IF;
+    ELSE
+        StageCode := 0;
+        StageTick := 0;
+    END_CASE;
+
+    // Synthetic process profile. Values are deterministic and do not
+    // represent measurements from physical sensors.
+    CASE StageCode OF
+        0: // IDLE
+            SimCastingSpeed := 0.0;
+            SimMoldLevel := 55.0;
+            SimTundishTemperature := 1548.0;
+            SimTundishWeight := 38.0;
+            SimOscillation := 0.0;
+            SimStopperPosition := 0.0;
+
+        1: // PREPARE
+            SimCastingSpeed := 0.0;
+            SimMoldLevel := 68.0;
+            SimTundishTemperature := 1548.0;
+            SimTundishWeight := 38.0;
+            SimOscillation := 0.0;
+            SimStopperPosition := 0.0;
+
+        2: // START_CAST
+            StageRatio := DINT_TO_REAL(StageTick) / 200.0;
+            SimCastingSpeed := 0.4 + (1.8 * StageRatio);
+            SimMoldLevel := 68.0 + (2.0 * StageRatio);
+            SimTundishTemperature := 1548.0 - (4.0 * StageRatio);
+            SimTundishWeight := 38.0 - (4.0 * StageRatio);
+            SimOscillation := 120.0 + (20.0 * StageRatio);
+            SimStopperPosition := 36.0 + (8.0 * StageRatio);
+
+        3: // STEADY_CAST
+            StageRatio := DINT_TO_REAL(StageTick) / 2100.0;
+            SimCastingSpeed := 2.45;
+            SimMoldLevel := 70.0;
+            SimTundishTemperature := 1544.0 - (8.0 * StageRatio);
+            SimTundishWeight := 34.0 - (25.0 * StageRatio);
+            SimOscillation := 145.0;
+            SimStopperPosition := 42.0;
+
+        4: // END_CAST
+            StageRatio := DINT_TO_REAL(StageTick) / 200.0;
+            SimCastingSpeed := 2.2 - (1.9 * StageRatio);
+            SimMoldLevel := 70.0 - (15.0 * StageRatio);
+            SimTundishTemperature := 1536.0 - (4.0 * StageRatio);
+            SimTundishWeight := 9.0 - (6.5 * StageRatio);
+            SimOscillation := 140.0 - (100.0 * StageRatio);
+            SimStopperPosition := 38.0 - (30.0 * StageRatio);
+
+    ELSE
+        SimCastingSpeed := 0.0;
+        SimMoldLevel := 55.0;
+        SimTundishTemperature := 1548.0;
+        SimTundishWeight := 38.0;
+        SimOscillation := 0.0;
+        SimStopperPosition := 0.0;
+    END_CASE;
+
+    // Publish only to the dedicated global R&D data block.
+    DB300.CastingSpeed := FC300(Value := SimCastingSpeed, Minimum := 0.0, Maximum := 3.0);
+    DB300.TundishTemperature := FC300(Value := SimTundishTemperature, Minimum := 1400.0, Maximum := 1600.0);
+    DB300.MoldLevelPercent := FC300(Value := SimMoldLevel, Minimum := 0.0, Maximum := 100.0);
+    DB300.TundishWeightTon := FC300(Value := SimTundishWeight, Minimum := 0.0, Maximum := 40.0);
+    DB300.MoldCoolingWaterFlowM3h := 925.0;
+    DB300.MoldCoolingWaterDeltaC := 7.2;
+    DB300.SecondaryCoolingFlowM3h := 680.0;
+    DB300.OscillationFrequencyCpm := FC300(Value := SimOscillation, Minimum := 0.0, Maximum := 200.0);
+    DB300.StopperPositionPercent := FC300(Value := SimStopperPosition, Minimum := 0.0, Maximum := 100.0);
+    DB300.StageCode := StageCode;
+    DB300.HeatNumber := HeatNumber;
+    DB300.AlarmCode := 0;
+
+    // Status bit map: bit0 Ready, bit1 Running, bit2 Fault,
+    // bit3 CastingActive, bit4 CoolingWaterOK, bit5 MoldLevelControlOK,
+    // bit6 EmergencyStopOK, bit7 InterlockOK.
+    // This R&D model has no physical E-stop or interlock inputs.
+    // These bits mean only that the synthetic demonstration is healthy.
+    IF (StageCode = 0) OR (StageCode = 1) THEN
+        DB300.StatusFlags := B#16#F1; // Ready + simulated permissives
+    ELSE
+        DB300.StatusFlags := B#16#FA; // Running + casting + simulated permissives
+    END_IF;
+END_FUNCTION_BLOCK
+
+
+FUNCTION_BLOCK FB310
+VAR
+    ScanCounter                    : DINT := 0;
+    HeartbeatDivider               : INT := 0;
+    HeartbeatState                 : BOOL := FALSE;
+END_VAR
+BEGIN
+    IF ScanCounter < 2000000000 THEN
+        ScanCounter := ScanCounter + 1;
+    ELSE
+        ScanCounter := 0;
+    END_IF;
+
+    HeartbeatDivider := HeartbeatDivider + 1;
+    IF HeartbeatDivider >= 5 THEN
+        HeartbeatState := NOT HeartbeatState;
+        HeartbeatDivider := 0;
+    END_IF;
+
+    DB310.ScanCounter := ScanCounter;
+
+    // OB1 cycle time is intentionally not claimed or estimated here.
+    // Zero means "not measured by this R&D source".
+    DB310.CycleTimeMs := 0.0;
+
+    // DBX8.0 = watchdog/status task executed; DBX8.1 = comms not measured;
+    // DBX8.2 = heartbeat. No external communication health is asserted.
+    IF HeartbeatState THEN
+        DB310.StatusBits := B#16#05;
+    ELSE
+        DB310.StatusBits := B#16#01;
+    END_IF;
+END_FUNCTION_BLOCK
+
+
+ORGANIZATION_BLOCK OB1
+VAR_TEMP
+    OB1_HEADER                    : ARRAY [1..20] OF BYTE;
+END_VAR
+BEGIN
+    // One owner per DB. FB300 owns DB300; FB310 owns DB310.
+    FB300.DB301 ();
+    FB310.DB311 ();
+END_ORGANIZATION_BLOCK

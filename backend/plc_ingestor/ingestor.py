@@ -21,6 +21,10 @@ logging.basicConfig(
 )
 LOGGER = logging.getLogger("plc-ingestor")
 
+
+class ConfigurationError(RuntimeError):
+    """Raised when PLC ingestion configuration is incomplete or invalid."""
+
 DB_HOST: Final = os.getenv("DB_HOST", "historian-db")
 DB_PORT: Final = int(os.getenv("DB_PORT", "5432"))
 DB_NAME: Final = os.getenv("POSTGRES_DB", "steelmaking_level2")
@@ -48,9 +52,9 @@ def load_source_kind_overrides() -> dict[str, str]:
     try:
         raw = json.loads(SOURCE_KIND_OVERRIDES_RAW or "{}")
     except json.JSONDecodeError as exc:
-        raise ValueError("PLC_SOURCE_KIND_OVERRIDES_JSON is not valid JSON") from exc
+        raise ConfigurationError("PLC_SOURCE_KIND_OVERRIDES_JSON is not valid JSON") from exc
     if not isinstance(raw, dict):
-        raise ValueError("PLC_SOURCE_KIND_OVERRIDES_JSON must be a JSON object")
+        raise ConfigurationError("PLC_SOURCE_KIND_OVERRIDES_JSON must be a JSON object")
 
     allowed = {"OPCUA", "REAL_S7", "RND_PLC_TEST"}
     overrides: dict[str, str] = {}
@@ -58,9 +62,9 @@ def load_source_kind_overrides() -> dict[str, str]:
         normalized_area = str(area).strip().upper()
         normalized_kind = str(source_kind).strip().upper()
         if not normalized_area:
-            raise ValueError("Source-kind override area cannot be empty")
+            raise ConfigurationError("Source-kind override area cannot be empty")
         if normalized_kind not in allowed:
-            raise ValueError(
+            raise ConfigurationError(
                 f"Unsupported source kind {source_kind!r} for area {normalized_area}; "
                 f"allowed values are {sorted(allowed)}"
             )
@@ -69,10 +73,6 @@ def load_source_kind_overrides() -> dict[str, str]:
 
 
 SOURCE_KIND_OVERRIDES: Final = load_source_kind_overrides()
-
-
-class ConfigurationError(RuntimeError):
-    """Raised when PLC ingestion configuration is incomplete or invalid."""
 
 
 def utc_now() -> datetime:

@@ -3,9 +3,10 @@
 ## Architecture
 
 The synthetic process model runs on Ubuntu in the optional
-`ccm-rnd-s7-writer` service. It uses Snap7 to write only the dedicated R&D data
-blocks DB300 and DB310. The central OPC UA gateway remains read-only and reads
-the physical S7 DBs; the ingestor stores CCM samples with
+`ccm-rnd-s7-writer` service, defined separately in
+`docker-compose.ccm-rnd-writer.yml`. It uses Snap7 to write only the dedicated
+R&D data blocks DB300 and DB310. The central OPC UA gateway remains read-only
+and reads the physical S7 DBs; the ingestor stores CCM samples with
 `attributes.source_kind = "RND_PLC_TEST"`.
 
 The writer is disabled by default, is not part of the normal Compose startup,
@@ -58,10 +59,10 @@ verified and reserved.
 Build and run one synthetic sample:
 
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.ccm-rnd.yml \
+docker compose -f docker-compose.yml -f docker-compose.ccm-rnd-writer.yml \
   --profile ccm-rnd-writer build ccm-rnd-s7-writer
 
-docker compose -f docker-compose.yml -f docker-compose.ccm-rnd.yml \
+docker compose -f docker-compose.yml -f docker-compose.ccm-rnd-writer.yml \
   --profile ccm-rnd-writer run --rm ccm-rnd-s7-writer \
   python ccm_s7_writer.py --once
 ```
@@ -76,7 +77,7 @@ After confirming that DB300/DB310 are intended for this R&D test, run:
 ```bash
 mkdir -p data/ccm-rnd-plc-backups
 
-docker compose -f docker-compose.yml -f docker-compose.ccm-rnd.yml \
+docker compose -f docker-compose.yml -f docker-compose.ccm-rnd-writer.yml \
   --profile ccm-rnd-writer run --rm ccm-rnd-s7-writer \
   python ccm_s7_writer.py --backup-only
 
@@ -104,7 +105,7 @@ CCM_RND_DB_LAYOUT_ACK=DB300_48_DB310_12_VERIFIED_AND_RESERVED
 Then run one explicitly armed sample:
 
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.ccm-rnd.yml \
+docker compose -f docker-compose.yml -f docker-compose.ccm-rnd-writer.yml \
   --profile ccm-rnd-writer run --rm ccm-rnd-s7-writer \
   python ccm_s7_writer.py --enable-plc-writes --once
 ```

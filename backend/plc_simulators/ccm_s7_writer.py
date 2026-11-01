@@ -1,12 +1,16 @@
 from __future__ import annotations
 
 import argparse
+import base64
+import hashlib
 import json
 import logging
 import math
 import os
 import struct
 import time
+from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 
 import snap7
@@ -47,7 +51,7 @@ def _finite_float(values: dict[str, Any], key: str) -> float:
 
 
 def pack_process_db(values: dict[str, Any]) -> bytearray:
-    """Pack the reviewed R&D DB300 contract in S7 big-endian byte order."""
+    """Pack the proposed R&D DB300 contract in S7 big-endian byte order."""
     data = bytearray(PROCESS_DB_SIZE)
     real_fields = (
         ("CCM.CastingSpeed", 0),
@@ -116,7 +120,7 @@ def require_write_acknowledgements() -> None:
         )
 
 
-def connect_and_preflight() -> snap7.Client:
+def connect_and_preflight() -> tuple[snap7.Client, bytearray, bytearray]:
     host = os.getenv("CCM_RND_PLC_HOST", "192.168.1.10")
     port = int(os.getenv("CCM_RND_PLC_PORT", "102"))
     rack = int(os.getenv("CCM_RND_PLC_RACK", "0"))
@@ -124,25 +128,62 @@ def connect_and_preflight() -> snap7.Client:
 
     client = snap7.Client()
     LOGGER.warning(
-        "Connecting to R&D PLC %s:%s rack=%s slot=%s for DB-only test writes",
+        "Connecting to R&D PLC %s:%s rack=%s slot=%s for read-only DB preflight",
         host, port, rack, slot,
     )
     client.connect(host, rack, slot, tcp_port=port)
 
-    # Read-only preflight. These reads do not prove semantic layout; the
-    # separate operator acknowledgement above is required before writes.
-    process = client.db_read(PROCESS_DB, 0, PROCESS_DB_SIZE)
-    diagnostics = client.db_read(DIAGNOSTIC_DB, 0, DIAGNOSTIC_DB_SIZE)
-    if len(process) != PROCESS_DB_SIZE or len(diagnostics) != DIAGNOSTIC_DB_SIZE:
+    try:
+        process = client.db_read(PROCESS_DB, 0, PROCESS_DB_SIZE)
+        diagnostics = client.db_read(DIAGNOSTIC_DB, 0, DIAGNOSTIC_DB_SIZE)
+        if len(process) != PROCESS_DB_SIZE or len(diagnostics) != DIAGNOSTIC_DB_SIZE:
+            raise RuntimeError("PLC DB preflight returned unexpected block lengths")
+    except Exception:
         client.disconnect()
-        raise RuntimeError("PLC DB preflight returned unexpected block lengths")
+        raise
 
     LOGGER.warning(
-        "Read-only preflight passed: DB%d=%d bytes, DB%d=%d bytes. "
-        "No PLC outputs or non-DB areas are accessed.",
+        "Read-only preflight passed: DB%d first %d bytes, DB%d first %d bytes.",
         PROCESS_DB, len(process), DIAGNOSTIC_DB, len(diagnostics),
     )
-    return client
+    return client, bytearray(process), bytearray(diagnostics)
+
+
+def save_db_backup(process: bytearray, diagnostics: bytearray) -> Path:
+    """Persist the exact DB ranges that this writer may later overwrite."""
+    backup_dir = Path(os.getenv("CCM_RND_BACKUP_DIR", "/backups"))
+    backup_dir.mkdir(parents=True, exist_ok=True)
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    payload = {
+        "created_at_utc": datetime.now(timezone.utc).isoformat(),
+        "endpoint": {
+            "host": os.getenv("CCM_RND_PLC_HOST", "192.168.1.10"),
+            "port": int(os.getenv("CCM_RND_PLC_PORT", "102")),
+            "rack": int(os.getenv("CCM_RND_PLC_RACK", "0")),
+            "slot": int(os.getenv("CCM_RND_PLC_SLOT", "3")),
+        },
+        "note": "Raw pre-write DB byte ranges only; this is not a STEP 7 station or program backup.",
+        "dbs": {
+            str(PROCESS_DB): {
+                "read_length": len(process),
+                "hex": process.hex(),
+                "base64": base64.b64encode(process).decode("ascii"),
+                "sha256": hashlib.sha256(process).hexdigest(),
+            },
+            str(DIAGNOSTIC_DB): {
+                "read_length": len(diagnostics),
+                "hex": diagnostics.hex(),
+                "base64": base64.b64encode(diagnostics).decode("ascii"),
+                "sha256": hashlib.sha256(diagnostics).hexdigest(),
+            },
+        },
+    }
+    target = backup_dir / f"ccm-rnd-prewrite-{timestamp}.json"
+    temporary = target.with_suffix(".tmp")
+    temporary.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    temporary.replace(target)
+    LOGGER.warning("Pre-write DB backup saved to %s", target)
+    return target
 
 
 def main() -> int:
@@ -155,11 +196,19 @@ def main() -> int:
         help="Arm DB300/DB310 writes; requires the exact DB layout acknowledgement in the environment.",
     )
     parser.add_argument(
+        "--backup-only",
+        action="store_true",
+        help="Read DB300/DB310 and save their raw bytes locally; performs no PLC writes.",
+    )
+    parser.add_argument(
         "--once",
         action="store_true",
         help="Generate one sample and exit (dry-run unless --enable-plc-writes is also supplied).",
     )
     args = parser.parse_args()
+
+    if args.backup_only and (args.enable_plc_writes or args.once):
+        parser.error("--backup-only cannot be combined with --enable-plc-writes or --once")
 
     logging.basicConfig(
         level=os.getenv("CCM_RND_LOG_LEVEL", "INFO").upper(),
@@ -168,9 +217,21 @@ def main() -> int:
 
     write_enabled = args.enable_plc_writes
     client: snap7.Client | None = None
+    if args.backup_only:
+        client, process_backup, diagnostic_backup = connect_and_preflight()
+        try:
+            save_db_backup(process_backup, diagnostic_backup)
+        finally:
+            client.disconnect()
+        LOGGER.warning("Backup-only operation complete; no PLC writes were performed.")
+        return 0
+
     if write_enabled:
         require_write_acknowledgements()
-        client = connect_and_preflight()
+        client, process_backup, diagnostic_backup = connect_and_preflight()
+        # A persistent pre-write backup is mandatory. If this fails, execution
+        # stops before the first DB write.
+        save_db_backup(process_backup, diagnostic_backup)
     else:
         LOGGER.warning(
             "DRY-RUN MODE: no PLC connection and no writes. "
@@ -186,7 +247,8 @@ def main() -> int:
             tick_started = time.perf_counter()
             elapsed = time.monotonic() - started
             scan_counter += 1
-            heartbeat = not heartbeat if scan_counter % 5 == 0 else heartbeat
+            if scan_counter % 5 == 0:
+                heartbeat = not heartbeat
 
             sample = process_values(elapsed, scan_counter)
             cycle_time_ms = (time.perf_counter() - tick_started) * 1000.0

@@ -38,7 +38,6 @@ STRUCT
     AlarmCode                    : INT  := 0;         // DBW 46
 END_STRUCT
 BEGIN
-:
 END_DATA_BLOCK
 
 
@@ -50,7 +49,6 @@ STRUCT
     ReservedBytes                : ARRAY [0..2] OF BYTE;
 END_STRUCT
 BEGIN
-:
 END_DATA_BLOCK
 
 

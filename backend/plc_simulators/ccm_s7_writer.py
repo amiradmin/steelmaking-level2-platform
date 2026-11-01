@@ -207,6 +207,14 @@ def main() -> int:
     )
     args = parser.parse_args()
 
+    if args.enable_plc_writes:
+        parser.error(
+            "physical writes are disabled in the PLC-native architecture: "
+            "FB300 owns DB300 and FB310 owns DB310. Use Snap7 read-only "
+            "verification after the Siemens SCL application has been safely "
+            "compiled and commissioned."
+        )
+
     if args.backup_only and (args.enable_plc_writes or args.once):
         parser.error("--backup-only cannot be combined with --enable-plc-writes or --once")
 

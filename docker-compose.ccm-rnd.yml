@@ -1,9 +1,9 @@
-# Opt-in CCM R&D profile.
+# Opt-in CCM R&D Level-2 integration.
 #
 # This overlay redirects ONLY the CCM gateway client to the dedicated physical
-# S7-400H. EAF and LF remain on their existing simulators. The gateway is
-# read-only. The separate Ubuntu writer is opt-in, starts in dry-run mode, and
-# can write only the explicitly reserved DB300/DB310 ranges after two guards.
+# S7-400H. EAF and LF remain on their existing simulators. The central gateway
+# remains read-only; Ubuntu-side generation is configured separately in
+# docker-compose.ccm-rnd-writer.yml.
 services:
   central-opcua-server:
     environment:
@@ -28,27 +28,3 @@ services:
       CCM_PLC_PORT: ${CCM_RND_PLC_PORT:-102}
       CCM_PLC_RACK: ${CCM_RND_PLC_RACK:-0}
       CCM_PLC_SLOT: ${CCM_RND_PLC_SLOT:-3}
-
-  ccm-rnd-s7-writer:
-    profiles:
-      - ccm-rnd-writer
-    build:
-      context: ./backend/plc_simulators
-    container_name: steelmaking-level2-ccm-rnd-s7-writer
-    command: ["python", "ccm_s7_writer.py"]
-    restart: "no"
-    environment:
-      CCM_RND_PLC_HOST: ${CCM_RND_PLC_HOST:-192.168.1.10}
-      CCM_RND_PLC_PORT: ${CCM_RND_PLC_PORT:-102}
-      CCM_RND_PLC_RACK: ${CCM_RND_PLC_RACK:-0}
-      CCM_RND_PLC_SLOT: ${CCM_RND_PLC_SLOT:-3}
-      CCM_RND_SCAN_SECONDS: ${CCM_RND_SCAN_SECONDS:-1.0}
-      CCM_RND_DB_LAYOUT_ACK: ${CCM_RND_DB_LAYOUT_ACK:-}
-      CCM_RND_BACKUP_DIR: /backups
-      PLC_SIM_EPOCH_UNIX: ${PLC_SIM_EPOCH_UNIX:-1788220800}
-      PLC_SIM_TIME_SCALE: ${PLC_SIM_TIME_SCALE:-60}
-      PLC_SIM_HEAT_BASE: ${PLC_SIM_HEAT_BASE:-260001}
-      PLC_SIM_HEAT_PITCH_MINUTES: ${PLC_SIM_HEAT_PITCH_MINUTES:-70}
-      PLC_SIM_FAULT_MODE: ${CCM_PLC_SIM_FAULT_MODE:-NONE}
-    volumes:
-      - ./data/ccm-rnd-plc-backups:/backups

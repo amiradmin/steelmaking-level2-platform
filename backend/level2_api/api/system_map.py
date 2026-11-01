@@ -95,7 +95,9 @@ def _latest_controller_samples() -> dict[str, dict[str, Any]]:
                     WHERE ps.ts >= NOW() - (%s * INTERVAL '1 second')
                 ) AS samples_last_window,
                 (ARRAY_AGG(ps.attributes ->> 'source_kind' ORDER BY ps.ts DESC))[1]
-                    AS latest_source_kind
+                    AS latest_source_kind,
+                (ARRAY_AGG(ps.quality::text ORDER BY ps.ts DESC))[1]
+                    AS latest_quality
             FROM process_samples ps
             JOIN process_tags pt ON pt.id = ps.tag_id
             WHERE pt.tag_name LIKE 'EAF.%%'
@@ -108,11 +110,12 @@ def _latest_controller_samples() -> dict[str, dict[str, Any]]:
         rows = cursor.fetchall()
 
     result = {"eaf": {}, "lf": {}, "ccm": {}}
-    for controller, last_sample_at, sample_count, latest_source_kind in rows:
+    for controller, last_sample_at, sample_count, latest_source_kind, latest_quality in rows:
         result[str(controller)] = {
             "last_sample_at": last_sample_at,
             "samples_last_window": int(sample_count),
             "latest_source_kind": latest_source_kind,
+            "latest_quality": latest_quality,
         }
     return result
 
@@ -179,7 +182,12 @@ def live_system_map(request: Request) -> Response:
     ccm_telemetry = controllers.get("ccm", {})
     ccm_source_kind = ccm_telemetry.get("latest_source_kind")
     ccm_rnd_sample_fresh = _status_from_timestamp(ccm_telemetry.get("last_sample_at")) == "online"
-    ccm_rnd_active = ccm_rnd_configured and ccm_source_kind == "RND_PLC_TEST" and ccm_rnd_sample_fresh
+    ccm_rnd_active = (
+        ccm_rnd_configured
+        and ccm_source_kind == "RND_PLC_TEST"
+        and ccm_telemetry.get("latest_quality") == "GOOD"
+        and ccm_rnd_sample_fresh
+    )
 
     controller_config = {
         "eaf": (

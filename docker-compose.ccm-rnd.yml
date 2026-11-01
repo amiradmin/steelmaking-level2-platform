@@ -1,0 +1,32 @@
+# Opt-in CCM R&D profile.
+#
+# This overlay redirects ONLY the CCM gateway client to the dedicated physical
+# S7-400H. EAF and LF remain on their existing simulators. A separately reviewed
+# full gateway map is mandatory; the simulation-only map is never accepted as a
+# fallback for the physical CCM.
+services:
+  central-opcua-server:
+    environment:
+      CCM_PLC_HOST: ${CCM_RND_PLC_HOST:?Set CCM_RND_PLC_HOST to the R&D S7-400H IP}
+      CCM_PLC_PORT: ${CCM_RND_PLC_PORT:-102}
+      CCM_PLC_RACK: ${CCM_RND_PLC_RACK:-0}
+      CCM_PLC_SLOT: ${CCM_RND_PLC_SLOT:-3}
+      OPCUA_GATEWAY_MAP_PATH: /app/s7_address_map.ccm-rnd.json
+      # EAF/LF simulators may remain connected while CCM is being commissioned.
+      OPCUA_GATEWAY_REQUIRE_ALL_PLC: "0"
+    volumes:
+      - "${CCM_RND_S7_ADDRESS_MAP_FILE:?Set CCM_RND_S7_ADDRESS_MAP_FILE to a reviewed full S7 map}:/app/s7_address_map.ccm-rnd.json:ro"
+
+  plc-ingestor-central-test:
+    environment:
+      # Explicitly prevent CCM from being mislabeled as REAL_S7.
+      PLC_REAL_AREAS: ""
+      PLC_SOURCE_KIND_OVERRIDES_JSON: '{"CCM":"RND_PLC_TEST"}'
+
+  level2-api:
+    environment:
+      CCM_PLC_SOURCE_MODE: RND_PLC_TEST
+      CCM_PLC_HOST: ${CCM_RND_PLC_HOST:?Set CCM_RND_PLC_HOST to the R&D S7-400H IP}
+      CCM_PLC_PORT: ${CCM_RND_PLC_PORT:-102}
+      CCM_PLC_RACK: ${CCM_RND_PLC_RACK:-0}
+      CCM_PLC_SLOT: ${CCM_RND_PLC_SLOT:-3}

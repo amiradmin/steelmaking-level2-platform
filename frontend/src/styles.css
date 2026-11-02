@@ -130,9 +130,12 @@ button, select { cursor: pointer; }
 .sidebar-brand { padding: 18px 17px 16px; border-bottom: 1px solid var(--border-soft); }
 .sidebar-brand .logo-frame { width: 56px; height: 48px; }
 .sidebar-brand .brand-copy strong { font-size: 13px; }
-.sidebar-partner { display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 2px 4px 12px; }
-.sidebar-partner img { display: block; width: 100%; max-width: 218px; height: 58px; object-fit: contain; object-position: center; border-radius: 6px; background: #fff; }
-.sidebar-partner span { color: var(--muted); font-size: 9px; letter-spacing: .04em; }
+.sidebar-partner { display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 10px; padding: 12px 4px 2px; border-top: 1px solid var(--border-soft); }
+.partner-emblem-frame { width: 48px; height: 48px; display: block; position: relative; flex: none; overflow: hidden; border: 1px solid rgba(9, 39, 74, .15); border-radius: 8px; background: #fff; }
+.partner-emblem-frame img { position: absolute; top: 0; left: -77px; display: block; width: 173px; height: 48px; max-width: none; object-fit: fill; }
+.partner-copy { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.partner-copy strong { color: var(--text); font-size: 12px; letter-spacing: .08em; }
+.partner-copy small { color: var(--muted); font-size: 9px; }
 .link-health { margin: 12px 14px 7px; padding: 9px 11px; display: flex; align-items: center; gap: 10px; border: 1px solid color-mix(in srgb, var(--cyan) 25%, var(--border)); border-radius: 9px; background: var(--cyan-soft); }
 .link-health > span:last-child { display: flex; flex-direction: column; gap: 1px; direction: ltr; text-align: left; }
 .link-health strong { color: var(--cyan); font: 600 8px 'JetBrains Mono', monospace; }

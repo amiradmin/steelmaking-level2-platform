@@ -130,6 +130,12 @@ button, select { cursor: pointer; }
 .sidebar-brand { padding: 18px 17px 16px; border-bottom: 1px solid var(--border-soft); }
 .sidebar-brand .logo-frame { width: 56px; height: 48px; }
 .sidebar-brand .brand-copy strong { font-size: 13px; }
+.sidebar-partner { display: flex; align-items: center; gap: 9px; margin-top: 12px; padding: 10px 0 0; border-top: 1px solid var(--border-soft); }
+.partner-logo-frame { width: 38px; height: 38px; display: flex; align-items: center; justify-content: flex-end; flex: none; overflow: hidden; padding: 2px; border: 1px solid rgba(9, 39, 74, .15); border-radius: 8px; background: #fff; }
+.partner-logo-frame img { display: block; width: auto; height: 34px; max-width: none; flex: none; margin-left: auto; object-fit: contain; object-position: right center; clip-path: none; transform: none; }
+.partner-copy { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.partner-copy strong { color: var(--text); font-size: 12px; letter-spacing: .08em; }
+.partner-copy small { color: var(--muted); font-size: 9px; }
 .link-health { margin: 12px 14px 7px; padding: 9px 11px; display: flex; align-items: center; gap: 10px; border: 1px solid color-mix(in srgb, var(--cyan) 25%, var(--border)); border-radius: 9px; background: var(--cyan-soft); }
 .link-health > span:last-child { display: flex; flex-direction: column; gap: 1px; direction: ltr; text-align: left; }
 .link-health strong { color: var(--cyan); font: 600 8px 'JetBrains Mono', monospace; }

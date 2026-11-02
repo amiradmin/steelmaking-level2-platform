@@ -431,10 +431,6 @@ function Dashboard({ theme, onThemeChange, onLogout, initialOperator }: { theme:
         <div className="sidebar-footer">
           <button type="button"><Icon name="settings" /> Shift Technical Support</button>
           <button type="button" onClick={onLogout}><Icon name="logout" /> Sign Out</button>
-          <div className="sidebar-partner" aria-label="MITE Technology Partner">
-            <span className="partner-emblem-frame"><img src="/mite_logo.png" alt="MITE emblem" /></span>
-            <span className="partner-copy"><strong>MITE</strong><small>Technology Partner</small></span>
-          </div>
         </div>
       </aside>
       {sidebarOpen && <button className="sidebar-scrim" type="button" onClick={() => setSidebarOpen(false)} aria-label="Close menu" />}
@@ -452,6 +448,10 @@ function Dashboard({ theme, onThemeChange, onLogout, initialOperator }: { theme:
             <ThemeToggle theme={theme} onChange={onThemeChange} />
             <button className="icon-button notification-button" type="button" aria-label="Notifications"><Icon name="bell" /><i>{alarms.length}</i></button>
             <div className="operator"><span><strong>{operator?.username ?? operator?.display_name ?? 'Level 2 Operator'}</strong><small>{operator?.role_label ?? 'Authenticated User'}</small></span><span className="operator-avatar"><Icon name="user" /></span></div>
+          </div>
+          <div className="dashboard-partner" aria-label="MITE Technology Partner">
+            <span className="partner-emblem-frame"><img src="/mite_logo.png" alt="MITE emblem" /></span>
+            <span className="partner-copy"><strong>MITE</strong><small>Technology Partner</small></span>
           </div>
         </header>
 

@@ -429,12 +429,12 @@ function Dashboard({ theme, onThemeChange, onLogout, initialOperator }: { theme:
           })}
         </nav>
         <div className="sidebar-footer">
-          <div className="sidebar-partner" aria-label="Technology partner MITE">
-            <img src="/mite_logo.png" alt="MITE company logo" />
-            <span>Technology Partner</span>
-          </div>
           <button type="button"><Icon name="settings" /> Shift Technical Support</button>
           <button type="button" onClick={onLogout}><Icon name="logout" /> Sign Out</button>
+          <div className="sidebar-partner" aria-label="MITE Technology Partner">
+            <span className="partner-emblem-frame"><img src="/mite_logo.png" alt="MITE emblem" /></span>
+            <span className="partner-copy"><strong>MITE</strong><small>Technology Partner</small></span>
+          </div>
         </div>
       </aside>
       {sidebarOpen && <button className="sidebar-scrim" type="button" onClick={() => setSidebarOpen(false)} aria-label="Close menu" />}

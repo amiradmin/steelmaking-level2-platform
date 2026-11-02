@@ -132,7 +132,7 @@ button, select { cursor: pointer; }
 .sidebar-brand .brand-copy strong { font-size: 13px; }
 .sidebar-partner { display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 10px; padding: 12px 4px 2px; border-top: 1px solid var(--border-soft); }
 .partner-emblem-frame { width: 48px; height: 48px; display: block; position: relative; flex: none; overflow: hidden; border: 1px solid rgba(9, 39, 74, .15); border-radius: 8px; background: #fff; }
-.partner-emblem-frame img { position: absolute; top: 0; left: -77px; display: block; width: 173px; height: 48px; max-width: none; object-fit: fill; }
+.partner-emblem-frame img { position: absolute; top: 0; left: -125px; display: block; width: 173px; height: 48px; max-width: none; object-fit: fill; }
 .partner-copy { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .partner-copy strong { color: var(--text); font-size: 12px; letter-spacing: .08em; }
 .partner-copy small { color: var(--muted); font-size: 9px; }

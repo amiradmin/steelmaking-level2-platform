@@ -417,13 +417,7 @@ function Dashboard({ theme, onThemeChange, onLogout, initialOperator }: { theme:
   return (
     <div className="dashboard-shell">
       <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
-        <div className="sidebar-brand">
-          <Brand />
-          <div className="sidebar-partner" aria-label="Technology partner MITE">
-            <span className="partner-logo-frame"><img src="/mite_logo.png" alt="MITE emblem" /></span>
-            <span className="partner-copy"><strong>MITE</strong><small>Technology Partner</small></span>
-          </div>
-        </div>
+        <div className="sidebar-brand"><Brand /></div>
         <div className="link-health"><span className={`status-dot ${realtimeHealthy ? 'online' : 'warning'}`} /><span><strong>{realtimeHealthy ? 'L1 / L2 LINK: ACTIVE' : 'L1 / L2 LINK: DEGRADED'}</strong><small>{l1AgeSeconds === null ? 'NO RECENT SAMPLE' : `${formatMetric(l1AgeSeconds, 1)} s · REALTIME`}</small></span></div>
         <nav className="side-nav" aria-label="System navigation">
           {navItems.map((item) => {
@@ -434,7 +428,14 @@ function Dashboard({ theme, onThemeChange, onLogout, initialOperator }: { theme:
             return <button className={active ? 'active' : ''} type="button" key={item.label} disabled={!enabled} aria-disabled={!enabled} title={enabled ? undefined : unavailableReason} onClick={() => { if (item.page) navigateToPage(item.page) }}><Icon name={item.icon} /><span>{item.label}</span>{item.badge && <em>{item.badge}</em>}</button>
           })}
         </nav>
-        <div className="sidebar-footer"><button type="button"><Icon name="settings" /> Shift Technical Support</button><button type="button" onClick={onLogout}><Icon name="logout" /> Sign Out</button></div>
+        <div className="sidebar-footer">
+          <div className="sidebar-partner" aria-label="Technology partner MITE">
+            <img src="/mite_logo.png" alt="MITE company logo" />
+            <span>Technology Partner</span>
+          </div>
+          <button type="button"><Icon name="settings" /> Shift Technical Support</button>
+          <button type="button" onClick={onLogout}><Icon name="logout" /> Sign Out</button>
+        </div>
       </aside>
       {sidebarOpen && <button className="sidebar-scrim" type="button" onClick={() => setSidebarOpen(false)} aria-label="Close menu" />}
 

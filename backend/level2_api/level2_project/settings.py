@@ -13,6 +13,11 @@ ALLOWED_HOSTS = [
     for value in os.getenv("DJANGO_ALLOWED_HOSTS", "*").split(",")
     if value.strip()
 ]
+CSRF_TRUSTED_ORIGINS = [
+    value.strip()
+    for value in os.getenv("DJANGO_CSRF_TRUSTED_ORIGINS", "").split(",")
+    if value.strip()
+]
 
 INSTALLED_APPS = [
     "daphne",

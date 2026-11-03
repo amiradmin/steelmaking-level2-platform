@@ -256,7 +256,7 @@ export function SystemMapTelemetryOverlay() {
         )
         if (!cancelled) setValuesByArea(Object.fromEntries(responses))
       } finally {
-        if (!cancelled) timer = window.setTimeout(() => { void refresh() }, 3000)
+        if (!cancelled) timer = window.setTimeout(() => { void refresh() }, 5000)
       }
     }
 
@@ -289,7 +289,7 @@ export function SystemMapTelemetryOverlay() {
           setRealError(error instanceof Error ? error.message : 'Real PLC endpoint unavailable')
         }
       } finally {
-        if (!cancelled) timer = window.setTimeout(() => { void refreshRealValues() }, 1000)
+        if (!cancelled) timer = window.setTimeout(() => { void refreshRealValues() }, 2000)
       }
     }
 

@@ -317,21 +317,27 @@ def historian_latest(
     return fetch_all(
         f"""
         SELECT
-            lpv.tag_name,
+            pt.tag_name,
             e.code AS equipment_code,
             e.area,
-            lpv.engineering_unit,
+            pt.engineering_unit,
             lpv.value_double,
             lpv.value_text,
             lpv.quality::text AS quality,
             lpv.ts,
             h.heat_no
-        FROM latest_process_values lpv
-        JOIN process_tags pt ON pt.id = lpv.tag_id
+        FROM process_tags pt
         LEFT JOIN equipment e ON e.id = pt.equipment_id
+        CROSS JOIN LATERAL (
+            SELECT ps.heat_id, ps.value_double, ps.value_text, ps.quality, ps.ts
+            FROM process_samples ps
+            WHERE ps.tag_id = pt.id
+            ORDER BY ps.ts DESC
+            LIMIT 1
+        ) lpv
         LEFT JOIN heats h ON h.id = lpv.heat_id
         WHERE {where}
-        ORDER BY e.area, lpv.tag_name
+        ORDER BY e.area, pt.tag_name
         """,
         params,
     )

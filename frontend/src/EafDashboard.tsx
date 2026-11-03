@@ -203,7 +203,7 @@ export function EafDashboard() {
       } catch (requestError) {
         if (!cancelled) setError(requestError instanceof Error ? requestError.message : 'EAF dashboard unavailable')
       } finally {
-        if (!cancelled) timer = window.setTimeout(() => { void refresh() }, 2000)
+        if (!cancelled) timer = window.setTimeout(() => { void refresh() }, 5000)
       }
     }
 

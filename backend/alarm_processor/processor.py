@@ -131,13 +131,20 @@ def _snapshot(conn: psycopg.Connection[Any], area: str) -> dict[str, dict[str, A
         cursor.execute(
             """
             SELECT
-                tag_name,
-                value_double,
-                value_text,
-                quality::text AS quality,
-                ts
-            FROM latest_process_values
-            WHERE tag_name = ANY(%s)
+                pt.tag_name,
+                latest.value_double,
+                latest.value_text,
+                latest.quality::text AS quality,
+                latest.ts
+            FROM process_tags pt
+            CROSS JOIN LATERAL (
+                SELECT ps.value_double, ps.value_text, ps.quality, ps.ts
+                FROM process_samples ps
+                WHERE ps.tag_id = pt.id
+                ORDER BY ps.ts DESC
+                LIMIT 1
+            ) latest
+            WHERE pt.tag_name = ANY(%s)
             """,
             [tags],
         )

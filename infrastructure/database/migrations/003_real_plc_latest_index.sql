@@ -12,6 +12,8 @@
 --   SELECT indexrelid::regclass, indisvalid
 --   FROM pg_index
 --   WHERE indexrelid = 'ix_process_samples_real_s7_latest'::regclass;
+-- If a chunk build fails and indisvalid is false, drop this index and rerun:
+--   DROP INDEX IF EXISTS ix_process_samples_real_s7_latest;
 
 CREATE INDEX IF NOT EXISTS ix_process_samples_real_s7_latest
     ON process_samples (tag_id, ts DESC)

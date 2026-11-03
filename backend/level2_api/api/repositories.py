@@ -96,17 +96,23 @@ def heats(*, status: str | None, limit: int) -> list[dict[str, Any]]:
 def heat_live_values(heat_id: int) -> list[dict[str, Any]]:
     return fetch_all(
         """
-        SELECT DISTINCT ON (ps.tag_id)
+        SELECT
             pt.tag_name,
             pt.engineering_unit,
-            ps.value_double,
-            ps.value_text,
-            ps.quality::text AS quality,
-            ps.ts
-        FROM process_samples ps
-        JOIN process_tags pt ON pt.id = ps.tag_id
-        WHERE ps.heat_id = %s
-        ORDER BY ps.tag_id, ps.ts DESC
+            latest.value_double,
+            latest.value_text,
+            latest.quality::text AS quality,
+            latest.ts
+        FROM process_tags pt
+        CROSS JOIN LATERAL (
+            SELECT ps.value_double, ps.value_text, ps.quality, ps.ts
+            FROM process_samples ps
+            WHERE ps.tag_id = pt.id
+              AND ps.heat_id = %s
+            ORDER BY ps.ts DESC
+            LIMIT 1
+        ) latest
+        ORDER BY pt.tag_name
         """,
         [heat_id],
     )

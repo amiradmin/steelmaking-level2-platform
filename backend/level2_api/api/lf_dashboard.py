@@ -100,27 +100,24 @@ def lf_dashboard(request: Request) -> Response:
 
         cursor.execute(
             """
-            WITH ranked AS (
-                SELECT
-                    pt.tag_name,
-                    pt.engineering_unit,
-                    ps.ts,
-                    ps.value_double,
-                    ps.value_text,
-                    ps.quality::text AS quality,
-                    ROW_NUMBER() OVER (
-                        PARTITION BY pt.tag_name
-                        ORDER BY ps.ts DESC
-                    ) AS rn
+            SELECT
+                pt.tag_name,
+                pt.engineering_unit,
+                recent.ts,
+                recent.value_double,
+                recent.value_text,
+                recent.quality::text AS quality
+            FROM process_tags pt
+            CROSS JOIN LATERAL (
+                SELECT ps.ts, ps.value_double, ps.value_text, ps.quality
                 FROM process_samples ps
-                JOIN process_tags pt ON pt.id = ps.tag_id
-                WHERE pt.tag_name = ANY(%s)
+                WHERE ps.tag_id = pt.id
                   AND ps.ts >= now() - interval '60 minutes'
-            )
-            SELECT tag_name, engineering_unit, ts, value_double, value_text, quality
-            FROM ranked
-            WHERE rn <= 120
-            ORDER BY tag_name, ts
+                ORDER BY ps.ts DESC
+                LIMIT 120
+            ) recent
+            WHERE pt.tag_name = ANY(%s)
+            ORDER BY pt.tag_name, recent.ts
             """,
             [list(TREND_TAGS)],
         )

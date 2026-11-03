@@ -51,20 +51,26 @@ def _live_values(heat_id: str) -> list[dict[str, Any]]:
     with connection.cursor() as cursor:
         cursor.execute(
             """
-            SELECT DISTINCT ON (ps.tag_id)
+            SELECT
                 pt.tag_name,
                 e.code AS equipment_code,
                 e.area,
                 pt.engineering_unit,
-                ps.value_double,
-                ps.value_text,
-                ps.quality::text AS quality,
-                ps.ts
-            FROM process_samples ps
-            JOIN process_tags pt ON pt.id = ps.tag_id
+                latest.value_double,
+                latest.value_text,
+                latest.quality::text AS quality,
+                latest.ts
+            FROM process_tags pt
             LEFT JOIN equipment e ON e.id = pt.equipment_id
-            WHERE ps.heat_id = %s::uuid
-            ORDER BY ps.tag_id, ps.ts DESC
+            CROSS JOIN LATERAL (
+                SELECT ps.value_double, ps.value_text, ps.quality, ps.ts
+                FROM process_samples ps
+                WHERE ps.tag_id = pt.id
+                  AND ps.heat_id = %s::uuid
+                ORDER BY ps.ts DESC
+                LIMIT 1
+            ) latest
+            ORDER BY pt.tag_name
             """,
             [heat_id],
         )

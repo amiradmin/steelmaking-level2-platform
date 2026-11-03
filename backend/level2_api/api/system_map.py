@@ -181,9 +181,11 @@ def _latest_opcua_sample() -> datetime | None:
     with connection.cursor() as cursor:
         cursor.execute(
             """
-            SELECT MAX(ts)
+            SELECT ts
             FROM process_samples
             WHERE attributes ->> 'source' = 'OPCUA'
+            ORDER BY ts DESC
+            LIMIT 1
             """
         )
         row = cursor.fetchone()

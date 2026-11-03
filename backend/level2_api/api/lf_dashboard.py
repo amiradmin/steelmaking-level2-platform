@@ -72,22 +72,28 @@ def lf_dashboard(request: Request) -> Response:
         cursor.execute(
             """
             SELECT
-                lpv.tag_name,
+                pt.tag_name,
                 pt.source_system,
                 pt.source_tag,
-                lpv.engineering_unit,
-                lpv.value_double,
-                lpv.value_text,
-                lpv.quality::text AS quality,
-                lpv.ts,
+                pt.engineering_unit,
+                latest.value_double,
+                latest.value_text,
+                latest.quality::text AS quality,
+                latest.ts,
                 h.heat_no
-            FROM latest_process_values lpv
-            JOIN process_tags pt ON pt.id = lpv.tag_id
+            FROM process_tags pt
             LEFT JOIN equipment e ON e.id = pt.equipment_id
-            LEFT JOIN heats h ON h.id = lpv.heat_id
+            CROSS JOIN LATERAL (
+                SELECT ps.heat_id, ps.value_double, ps.value_text, ps.quality, ps.ts
+                FROM process_samples ps
+                WHERE ps.tag_id = pt.id
+                ORDER BY ps.ts DESC
+                LIMIT 1
+            ) latest
+            LEFT JOIN heats h ON h.id = latest.heat_id
             WHERE pt.is_active = TRUE
-              AND (e.area = 'LF' OR lpv.tag_name LIKE 'LF.%')
-            ORDER BY lpv.tag_name
+              AND (e.area = 'LF' OR pt.tag_name LIKE 'LF.%')
+            ORDER BY pt.tag_name
             """
         )
         values = _dictfetchall(cursor)

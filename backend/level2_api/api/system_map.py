@@ -84,33 +84,76 @@ def _latest_controller_samples() -> dict[str, dict[str, Any]]:
     with connection.cursor() as cursor:
         cursor.execute(
             """
+            WITH controller_tags AS (
+                SELECT
+                    id AS tag_id,
+                    tag_name,
+                    CASE
+                        WHEN tag_name LIKE 'EAF.%%' THEN 'eaf'
+                        WHEN tag_name LIKE 'LF.%%' THEN 'lf'
+                        WHEN tag_name LIKE 'CCM.%%' THEN 'ccm'
+                    END AS controller
+                FROM process_tags
+                WHERE tag_name LIKE 'EAF.%%'
+                   OR tag_name LIKE 'LF.%%'
+                   OR tag_name LIKE 'CCM.%%'
+            ),
+            latest_per_tag AS (
+                -- The (tag_id, ts DESC) index makes this bounded to one row
+                -- per logical tag instead of aggregating the full historian.
+                SELECT
+                    ct.controller,
+                    latest.ts,
+                    latest.attributes,
+                    latest.quality
+                FROM controller_tags ct
+                CROSS JOIN LATERAL (
+                    SELECT ps.ts, ps.attributes, ps.quality
+                    FROM process_samples ps
+                    WHERE ps.tag_id = ct.tag_id
+                    ORDER BY ps.ts DESC
+                    LIMIT 1
+                ) latest
+            ),
+            latest_by_controller AS (
+                SELECT
+                    controller,
+                    MAX(ts) AS last_sample_at,
+                    (ARRAY_AGG(attributes ->> 'source_kind' ORDER BY ts DESC))[1]
+                        AS latest_source_kind,
+                    (ARRAY_AGG(quality::text ORDER BY ts DESC))[1]
+                        AS latest_quality
+                FROM latest_per_tag
+                GROUP BY controller
+            ),
+            recent_by_controller AS (
+                -- Time predicate is applied before aggregation, allowing the
+                -- ts index / Timescale chunk exclusion to limit the scan.
+                SELECT
+                    ct.controller,
+                    COUNT(*) AS samples_last_window,
+                    COUNT(DISTINCT ct.tag_name) FILTER (
+                        WHERE ps.quality::text = 'GOOD'
+                          AND ps.attributes ->> 'source_kind' = 'RND_PLC_TEST'
+                    ) AS good_rnd_tags_last_window
+                FROM process_samples ps
+                JOIN controller_tags ct ON ct.tag_id = ps.tag_id
+                WHERE ps.ts >= NOW() - (%s * INTERVAL '1 second')
+                GROUP BY ct.controller
+            )
             SELECT
-                CASE
-                    WHEN pt.tag_name LIKE 'EAF.%%' THEN 'eaf'
-                    WHEN pt.tag_name LIKE 'LF.%%' THEN 'lf'
-                    WHEN pt.tag_name LIKE 'CCM.%%' THEN 'ccm'
-                END AS controller,
-                MAX(ps.ts) AS last_sample_at,
-                COUNT(*) FILTER (
-                    WHERE ps.ts >= NOW() - (%s * INTERVAL '1 second')
-                ) AS samples_last_window,
-                (ARRAY_AGG(ps.attributes ->> 'source_kind' ORDER BY ps.ts DESC))[1]
-                    AS latest_source_kind,
-                (ARRAY_AGG(ps.quality::text ORDER BY ps.ts DESC))[1]
-                    AS latest_quality,
-                COUNT(DISTINCT pt.tag_name) FILTER (
-                    WHERE ps.ts >= NOW() - (%s * INTERVAL '1 second')
-                      AND ps.quality::text = 'GOOD'
-                      AND ps.attributes ->> 'source_kind' = 'RND_PLC_TEST'
-                ) AS good_rnd_tags_last_window
-            FROM process_samples ps
-            JOIN process_tags pt ON pt.id = ps.tag_id
-            WHERE pt.tag_name LIKE 'EAF.%%'
-               OR pt.tag_name LIKE 'LF.%%'
-               OR pt.tag_name LIKE 'CCM.%%'
-            GROUP BY 1
+                latest.controller,
+                latest.last_sample_at,
+                COALESCE(recent.samples_last_window, 0) AS samples_last_window,
+                latest.latest_source_kind,
+                latest.latest_quality,
+                COALESCE(recent.good_rnd_tags_last_window, 0)
+                    AS good_rnd_tags_last_window
+            FROM latest_by_controller latest
+            LEFT JOIN recent_by_controller recent
+                ON recent.controller = latest.controller
             """,
-            [FRESH_AFTER_SECONDS, FRESH_AFTER_SECONDS],
+            [FRESH_AFTER_SECONDS],
         )
         rows = cursor.fetchall()
 

@@ -29,12 +29,8 @@ export function AboutSystem() {
         </article>
 
         <article className="about-system-card">
-          <span className="about-system-card-label">DEVELOPER</span>
-          <h2>Amir Behvandi</h2>
-          <p className="about-system-role">Software Developer</p>
-          <p>
-            Design and software development of the Steelmaking Level 2 Platform.
-          </p>
+          <span className="about-system-card-label">TECHNOLOGY COLLABORATION</span>
+          <h2>MITE</h2>
         </article>
       </div>
 

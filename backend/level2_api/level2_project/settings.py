@@ -13,6 +13,11 @@ ALLOWED_HOSTS = [
     for value in os.getenv("DJANGO_ALLOWED_HOSTS", "*").split(",")
     if value.strip()
 ]
+# Explicitly permit the platform server address even when deployment
+# environment variables contain a restricted host list.
+PLATFORM_SERVER_IP = "172.16.18.53"
+if PLATFORM_SERVER_IP not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append(PLATFORM_SERVER_IP)
 
 INSTALLED_APPS = [
     "daphne",
@@ -133,4 +138,8 @@ _cors_origins = [
 ]
 CORS_ALLOW_ALL_ORIGINS = "*" in _cors_origins
 CORS_ALLOWED_ORIGINS = [value for value in _cors_origins if value != "*"]
+# The dashboard is served over HTTP on the platform server's LAN address.
+PLATFORM_SERVER_ORIGIN = f"http://{PLATFORM_SERVER_IP}"
+if PLATFORM_SERVER_ORIGIN not in CORS_ALLOWED_ORIGINS:
+    CORS_ALLOWED_ORIGINS.append(PLATFORM_SERVER_ORIGIN)
 CORS_ALLOW_CREDENTIALS = False

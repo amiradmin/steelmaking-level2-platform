@@ -109,6 +109,18 @@
   font-size: 17px;
 }
 
+.about-system-card h2 a,
+.about-system-details strong a {
+  color: #fff;
+  text-decoration: none;
+}
+
+.about-system-card h2 a:hover,
+.about-system-details strong a:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 .about-system-card p {
   font-size: 11px;
 }

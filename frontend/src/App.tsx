@@ -13,6 +13,7 @@ import { AccessControl } from './AccessControl'
 import { OverviewLiveOverlay } from './OverviewLiveOverlay'
 import { PlcSourceOverlay } from './PlcSourceOverlay'
 import { SystemMapTelemetryOverlay } from './SystemMapTelemetryOverlay'
+import { APP_VERSION } from './version'
 
 type Theme = 'dark' | 'light'
 type View = 'login' | 'dashboard'
@@ -252,7 +253,7 @@ function LoginPage({ theme, onThemeChange, onLogin }: { theme: Theme; onThemeCha
             {formError && <p className="form-error" role="alert">{formError}</p>}
             <button className="login-button" type="submit" disabled={submitting}><Icon name="logout" /> {submitting ? 'Authenticating…' : 'Sign in to Operations'}</button>
           </form>
-          <div className="support-row"><span>Shift technical support: Ext. 4218</span><span>Version 2.8.4</span></div>
+          <div className="support-row"><span>Shift technical support: Ext. 4218</span><span>Version {APP_VERSION}</span></div>
         </div>
       </section>
 

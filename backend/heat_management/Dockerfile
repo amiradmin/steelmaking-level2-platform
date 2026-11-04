@@ -5,8 +5,19 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-      ca-certificates \
+RUN set -eux; \
+    sed -i \
+      -e "s|http://deb.debian.org/debian-security|http://mirrors.aliyun.com/debian-security|g" \
+      -e "s|http://deb.debian.org/debian|http://mirror.famaserver.com/debian|g" \
+      /etc/apt/sources.list.d/debian.sources; \
+    apt-get update; \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ca-certificates; \
+    sed -i \
+      -e "s|http://mirrors.aliyun.com/debian-security|https://mirrors.aliyun.com/debian-security|g" \
+      -e "s|http://mirror.famaserver.com/debian|https://mirror.famaserver.com/debian|g" \
+      /etc/apt/sources.list.d/debian.sources; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends \
       python3 \
       python-is-python3 \
       python3-fastapi \

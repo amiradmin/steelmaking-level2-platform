@@ -37,4 +37,6 @@ COPY . .
 
 EXPOSE 8080
 
-CMD ["sh", "-c", "python3 manage.py migrate --noinput && python3 manage.py bootstrap_roles && python3 manage.py bootstrap_operator && exec python3 -m daphne -b 0.0.0.0 -p 8080 level2_project.asgi:application"]
+# Populate the shared static volume before starting Django so nginx can
+# serve the built-in Django admin CSS, JavaScript, and images.
+CMD ["sh", "-c", "python3 manage.py migrate --noinput && python3 manage.py bootstrap_roles && python3 manage.py bootstrap_operator && python3 manage.py collectstatic --noinput && exec python3 -m daphne -b 0.0.0.0 -p 8080 level2_project.asgi:application"]

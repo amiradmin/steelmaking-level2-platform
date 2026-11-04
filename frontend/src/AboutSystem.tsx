@@ -31,6 +31,9 @@ export function AboutSystem() {
         <article className="about-system-card">
           <span className="about-system-card-label">TECHNOLOGY COLLABORATION</span>
           <h2>MITE</h2>
+          <p>
+            Contributing technology expertise and collaboration to the development of the Steelmaking Level 2 Platform.
+          </p>
         </article>
       </div>
 

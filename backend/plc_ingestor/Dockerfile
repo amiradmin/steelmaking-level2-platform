@@ -9,11 +9,22 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_DEFAULT_TIMEOUT=120 \
     PYTHONPATH=/usr/lib/python3/dist-packages
 
-ARG PIP_INDEX_URL=https://pypi.org/simple
+ARG PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/
 ARG PIP_TRUSTED_HOST=
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-      ca-certificates \
+RUN set -eux; \
+    sed -i \
+      -e "s|http://deb.debian.org/debian-security|http://mirrors.aliyun.com/debian-security|g" \
+      -e "s|http://deb.debian.org/debian|http://mirror.famaserver.com/debian|g" \
+      /etc/apt/sources.list.d/debian.sources; \
+    apt-get update; \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ca-certificates; \
+    sed -i \
+      -e "s|http://mirrors.aliyun.com/debian-security|https://mirrors.aliyun.com/debian-security|g" \
+      -e "s|http://mirror.famaserver.com/debian|https://mirror.famaserver.com/debian|g" \
+      /etc/apt/sources.list.d/debian.sources; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends \
       python3-aiofiles \
       python3-aiosqlite \
       python3-cryptography \
@@ -36,7 +47,7 @@ RUN --mount=type=cache,id=steelmaking-pip-cache,target=/root/.cache/pip,sharing=
         -r requirements.txt; \
     fi && \
     python -m pip install --retries 10 --timeout 120 --no-deps \
-      "https://files.pythonhosted.org/packages/3f/0d/2f8fc320a12b6c8b972568a588ae57f4db7e9f7e7f53d02a24d0cebb17d7/asyncua-1.1.8-py3-none-any.whl#sha256=40c57151b93537beb77cb3f1a0190d75cef5326e8c40978de28b69e5b41e6ede" && \
+      "https://mirrors.aliyun.com/pypi/packages/3f/0d/2f8fc320a12b6c8b972568a588ae57f4db7e9f7e7f53d02a24d0cebb17d7/asyncua-1.1.8-py3-none-any.whl#sha256=40c57151b93537beb77cb3f1a0190d75cef5326e8c40978de28b69e5b41e6ede" && \
     python -c "import asyncua, cryptography, OpenSSL; print('PLC ingestor dependency check OK')"
 
 COPY ingestor.py bootstrap_flow_tags.py healthcheck.py opcua_simulator.py ./

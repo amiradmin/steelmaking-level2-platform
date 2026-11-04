@@ -30,7 +30,11 @@ export function AboutSystem() {
 
         <article className="about-system-card">
           <span className="about-system-card-label">TECHNOLOGY COLLABORATION</span>
-          <h2>MITE</h2>
+          <h2>
+            <a href="https://www.mite.co.ir/" target="_blank" rel="noopener noreferrer">
+              MITE
+            </a>
+          </h2>
           <p>
             Contributing technology expertise and collaboration to the development of the Steelmaking Level 2 Platform.
           </p>
@@ -48,7 +52,11 @@ export function AboutSystem() {
         </div>
         <div>
           <span>Technology Collaboration</span>
-          <strong>MITE</strong>
+          <strong>
+            <a href="https://www.mite.co.ir/" target="_blank" rel="noopener noreferrer">
+              MITE
+            </a>
+          </strong>
         </div>
         <div>
           <span>Developer</span>

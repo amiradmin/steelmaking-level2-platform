@@ -6,10 +6,12 @@ The project follows Semantic Versioning: `MAJOR.MINOR.PATCH`.
 
 ## [Unreleased]
 
-### Added
-- Establish a versioned release and change-history process.
-- Add the About System attribution for Mianeh Steel Company, MITE, and developer Amir Behvandi.
-- Display the application version consistently in the About page and login footer.
+## [0.1.1] - 2026-11-04
+
+### Changed
+- Add an explanatory description to the MITE technology collaboration card on the About System page.
+- Keep developer attribution for Amir Behvandi in the About page details and footer.
+- Align the displayed application version and frontend package version at 0.1.1.
 
 ## [0.1.0] - 2026-11-04
 

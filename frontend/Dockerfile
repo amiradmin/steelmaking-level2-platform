@@ -2,7 +2,11 @@ FROM node:20-alpine AS build
 
 WORKDIR /app
 COPY package.json package-lock.json ./
-RUN npm ci
+RUN npm ci \
+    --registry=https://mirror.novin.cloud/artifactory/api/npm/npm/ \
+    --replace-registry-host=registry.npmjs.org \
+    --fetch-retries=5 \
+    --fetch-timeout=120000
 COPY . .
 RUN npm run build
 

@@ -1,4 +1,5 @@
 import './about-system.css'
+import { APP_VERSION } from './version'
 
 export function AboutSystem() {
   return (
@@ -14,25 +15,25 @@ export function AboutSystem() {
             <p>Steelmaking Level 2 Operations Platform</p>
           </div>
         </div>
-        <span className="about-system-version">Version 1.0.0</span>
+        <span className="about-system-version">Version {APP_VERSION}</span>
       </div>
 
       <div className="about-system-grid">
         <article className="about-system-card about-system-card-primary">
-          <span className="about-system-card-label">DEVELOPED BY</span>
-          <h2>Fan Avar Sanat Madain Engineering Co.</h2>
+          <span className="about-system-card-label">PROJECT & INDUSTRIAL PARTNERSHIP</span>
+          <h2>Developed for Mianeh Steel Company</h2>
           <p>
-            This Steelmaking Level 2 System was developed by Fan Avar Sanat Madain Engineering Co.
-            for industrial production monitoring, process visibility, and Level 1 / Level 2 integration.
+            The Steelmaking Level 2 Platform is developed for Mianeh Steel Company in collaboration
+            with MITE to support industrial production monitoring, process visibility, and Level 1 / Level 2 integration.
           </p>
         </article>
 
         <article className="about-system-card">
-          <span className="about-system-card-label">SOFTWARE DEVELOPMENT</span>
+          <span className="about-system-card-label">DEVELOPER</span>
           <h2>Amir Behvandi</h2>
           <p className="about-system-role">Software Developer</p>
           <p>
-            Software implementation and application development for the Steelmaking Level 2 platform.
+            Design and software development of the Steelmaking Level 2 Platform.
           </p>
         </article>
       </div>
@@ -43,22 +44,22 @@ export function AboutSystem() {
           <strong>Steelmaking Level 2 Platform</strong>
         </div>
         <div>
-          <span>Plant</span>
-          <strong>Mianeh Steel Complex</strong>
+          <span>Client / Plant</span>
+          <strong>Mianeh Steel Company</strong>
         </div>
         <div>
-          <span>System Layer</span>
-          <strong>Level 2 Manufacturing Operations</strong>
+          <span>Technology Collaboration</span>
+          <strong>MITE</strong>
         </div>
         <div>
-          <span>Application Type</span>
-          <strong>Industrial Web Platform</strong>
+          <span>Developer</span>
+          <strong>Amir Behvandi</strong>
         </div>
       </article>
 
       <footer className="about-system-footer">
-        <span>© Fan Avar Sanat Madain Engineering Co. All rights reserved.</span>
-        <span>Steelmaking Level 2 Operations Platform</span>
+        <span>Developed for Mianeh Steel Company in collaboration with MITE.</span>
+        <span>Developer: Amir Behvandi · Steelmaking Level 2 Platform</span>
       </footer>
     </section>
   )

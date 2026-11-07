@@ -4,6 +4,17 @@ This folder contains Siemens S7-SCL source for a **standalone synthetic CCM
 process demonstration**. It is source code only. It has not been compiled for,
 or downloaded to, the physical S7-400H CPU.
 
+## Test PLC target reference
+
+The designated CCM test target is Siemens S7-400H, firmware V4.5.5, at
+`192.168.1.10`, using S7 communication over TCP/102 with rack 0 / slot 3.
+The reported communication processor is CP 443-1 EX20, order number
+`6GK7 443-1EX20-0XE0`. See
+[`docs/23-ccm-test-plc-step7.md`](../../docs/23-ccm-test-plc-step7.md)
+for the STEP 7 Classic engineering and commissioning procedure. Verify the
+CPU and CP physical positions in HW Config; the S7 rack/slot endpoint is not
+a substitute for identifying the CP's physical module slot.
+
 ## Blocks in the source
 
 | Block | Role |

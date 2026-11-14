@@ -130,7 +130,7 @@ button, select { cursor: pointer; }
 .sidebar-brand { padding: 18px 17px 16px; border-bottom: 1px solid var(--border-soft); }
 .sidebar-brand .logo-frame { width: 56px; height: 48px; }
 .sidebar-brand .brand-copy strong { font-size: 13px; }
-.dashboard-partner { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex: none; margin-left: 8px; padding-left: 16px; border-left: 1px solid var(--border); }
+.dashboard-partner { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex: none; margin-left: 8px; padding-left: 24px; border-left: 1px solid var(--border); }
 .partner-emblem-frame { width: 38px; height: 38px; display: block; position: relative; flex: none; overflow: hidden; border: 1px solid rgba(9, 39, 74, .15); border-radius: 8px; background: #fff; }
 .partner-emblem-frame img { position: absolute; top: 0; left: -99px; display: block; width: 137px; height: 38px; max-width: none; object-fit: fill; }
 .partner-copy { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
@@ -281,7 +281,7 @@ td code { color: var(--muted); font: 500 8px 'JetBrains Mono', monospace; }
   .login-stage { margin-top: 24px; }
   .login-panel { padding: 23px 20px; }
   .dashboard-topbar { padding: 0 12px; }
-  .dashboard-partner { gap: 0; margin-left: 4px; }
+  .dashboard-partner { gap: 0; margin-left: 4px; padding-left: 16px; }
   .dashboard-partner .partner-copy { display: none; }
   .dashboard-context > span:last-child { display: none; }
   .dashboard-content { padding: 16px 12px 28px; }

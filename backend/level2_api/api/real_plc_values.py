@@ -4,8 +4,9 @@ import os
 from datetime import datetime
 from typing import Any
 
-from django.db import connection
+from django.db import OperationalError, connection, transaction
 from django.utils import timezone
+from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.exceptions import ValidationError
 from rest_framework.request import Request
@@ -15,6 +16,8 @@ from .rbac import require_app_permission
 
 
 REAL_SOURCE_KIND = "REAL_S7"
+REAL_PLC_QUERY_TIMEOUT = "3s"
+QUERY_CANCELED_SQLSTATE = "57014"
 STALE_AFTER_SECONDS = float(os.getenv("REAL_PLC_STALE_AFTER_SECONDS", "10"))
 
 
@@ -30,7 +33,8 @@ def _latest_real_values(area: str) -> list[dict[str, Any]]:
     with BadNoCommunication quality. Those values are useful diagnostically but
     must never be presented as verified live plant process data.
     """
-    with connection.cursor() as cursor:
+    with transaction.atomic(), connection.cursor() as cursor:
+        cursor.execute("SELECT set_config('statement_timeout', %s, true)", [REAL_PLC_QUERY_TIMEOUT])
         cursor.execute(
             """
             SELECT
@@ -79,7 +83,15 @@ def real_plc_latest(request: Request) -> Response:
     if not area or len(area) > 64:
         raise ValidationError({"area": "Area must be a non-empty value up to 64 characters."})
 
-    values = sorted(_latest_real_values(area), key=lambda item: item["tag_name"])
+    try:
+        values = sorted(_latest_real_values(area), key=lambda item: item["tag_name"])
+    except OperationalError as error:
+        if getattr(error.__cause__, "sqlstate", None) != QUERY_CANCELED_SQLSTATE:
+            raise
+        return Response(
+            {"detail": "Verified physical PLC data is temporarily unavailable. Historian query timed out."},
+            status=status.HTTP_503_SERVICE_UNAVAILABLE,
+        )
     timestamps = [value["ts"] for value in values if isinstance(value.get("ts"), datetime)]
     latest_sample_at = max(timestamps, default=None)
     age_seconds = (

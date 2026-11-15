@@ -273,11 +273,16 @@ export function SystemMapTelemetryOverlay() {
     let cancelled = false
     let timer: number | null = null
 
+    let activeRequest: AbortController | null = null
+
     const refreshRealValues = async () => {
+      const request = new AbortController()
+      activeRequest = request
+      const deadline = window.setTimeout(() => request.abort(), 6000)
       try {
-        const response = await authorizedFetch('/api/v1/real-plc/latest?area=EAF')
+        const response = await authorizedFetch('/api/v1/real-plc/latest?area=EAF', { signal: request.signal })
         if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`)
+          throw new Error(`Verified PLC data unavailable (HTTP ${response.status})`)
         }
         const payload = await response.json() as RealPlcSnapshot
         if (!cancelled) {
@@ -286,9 +291,14 @@ export function SystemMapTelemetryOverlay() {
         }
       } catch (error) {
         if (!cancelled) {
-          setRealError(error instanceof Error ? error.message : 'Real PLC endpoint unavailable')
+          setRealSnapshot(null)
+          setRealError(request.signal.aborted
+            ? 'Verified PLC data unavailable (request timed out)'
+            : error instanceof Error ? error.message : 'Verified PLC data unavailable')
         }
       } finally {
+        window.clearTimeout(deadline)
+        activeRequest = null
         if (!cancelled) timer = window.setTimeout(() => { void refreshRealValues() }, 2000)
       }
     }
@@ -296,6 +306,7 @@ export function SystemMapTelemetryOverlay() {
     void refreshRealValues()
     return () => {
       cancelled = true
+      activeRequest?.abort()
       if (timer !== null) window.clearTimeout(timer)
     }
   }, [targets.length])
@@ -402,7 +413,7 @@ export function SystemMapTelemetryOverlay() {
                     <strong>{controller.isReal ? 'REAL PROCESS VALUES' : 'DECODED LIVE VALUES'}</strong>
                     <small>
                       {controller.isReal
-                        ? (realSnapshot?.verified ? `${realSnapshot.source_kind} · ${realSnapshot.fresh ? 'LIVE' : 'STALE'}` : 'NO VERIFIED DATA')
+                        ? (realSnapshot?.verified ? `${realSnapshot.source_kind} · ${realSnapshot.fresh ? 'LIVE' : 'STALE'}` : (realError ? 'VERIFIED DATA UNAVAILABLE' : 'NO VERIFIED DATA'))
                         : 'Historian'}
                     </small>
                   </div>
@@ -425,7 +436,7 @@ export function SystemMapTelemetryOverlay() {
                               : (realError ?? 'Waiting for historian samples marked source_kind=REAL_S7.')}
                           </span>
                         </div>
-                        <b>{realSnapshot?.verified ? (realSnapshot.fresh ? 'LIVE' : 'STALE') : 'WAITING'}</b>
+                        <b>{realSnapshot?.verified ? (realSnapshot.fresh ? 'LIVE' : 'STALE') : (realError ? 'UNAVAILABLE' : 'WAITING')}</b>
                       </div>
 
                       <div className="system-map-telemetry-table system-map-real-values">

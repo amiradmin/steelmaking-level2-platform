@@ -40,13 +40,6 @@ type Heat = {
   updated_at?: string | null
 }
 
-type ApiMeta = {
-  name: string
-  api_version: string
-  framework?: string
-  process_flow?: string[]
-}
-
 type Alarm = {
   alarm_code: string
   severity: string
@@ -293,6 +286,7 @@ function Dashboard({ theme, onThemeChange, onLogout, initialOperator }: { theme:
   const [loading, setLoading] = useState(true)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [operator, setOperator] = useState<OperatorProfile | null>(initialOperator)
+  const [operatorRetrying, setOperatorRetrying] = useState(false)
   const [telemetryStatus, setTelemetryStatus] = useState<TelemetryConnectionStatus>('connecting')
   const [l1LinkOnline, setL1LinkOnline] = useState(false)
   const [l1AgeSeconds, setL1AgeSeconds] = useState<number | null>(null)
@@ -328,45 +322,80 @@ function Dashboard({ theme, onThemeChange, onLogout, initialOperator }: { theme:
   }
 
   useEffect(() => {
-    let cancelled = false
-    Promise.all([
-      authorizedFetch('/api/v1/meta').then((response) => {
-        if (!response.ok) throw new Error('Metadata API unavailable')
-        return response.json() as Promise<ApiMeta>
-      }),
-      authorizedFetch('/api/v1/heats?limit=12').then((response) => {
-        if (!response.ok) throw new Error('Heat API unavailable')
-        return response.json() as Promise<Heat[]>
-      }),
-      authorizedFetch('/api/v1/auth/me').then((response) => {
+    let stopped = false
+    let retryTimer: number | undefined
+    let request: AbortController | undefined
+
+    async function loadOperator() {
+      const controller = new AbortController()
+      request = controller
+      const deadline = window.setTimeout(() => controller.abort(), 5000)
+      try {
+        const response = await authorizedFetch('/api/v1/auth/me', { signal: controller.signal })
         if (!response.ok) throw new Error('Operator profile unavailable')
-        return response.json() as Promise<OperatorProfile>
-      }),
-    ])
-      .then(([, heatResponse, operatorResponse]) => {
+        const profile = await response.json() as OperatorProfile
+        if (!stopped) setOperator(profile)
+      } catch (requestError) {
+        if (stopped) return
+        if (requestError instanceof AuthenticationExpiredError) {
+          onLogout()
+          return
+        }
+        setOperatorRetrying(true)
+        retryTimer = window.setTimeout(() => { void loadOperator() }, 3000)
+      } finally {
+        window.clearTimeout(deadline)
+      }
+    }
+
+    void loadOperator()
+    return () => {
+      stopped = true
+      request?.abort()
+      window.clearTimeout(retryTimer)
+    }
+  }, [onLogout])
+
+  useEffect(() => {
+    const request = new AbortController()
+    const deadline = window.setTimeout(() => request.abort(), 6000)
+    let cancelled = false
+
+    async function loadHeats() {
+      try {
+        const response = await authorizedFetch('/api/v1/heats?limit=12', { signal: request.signal })
+        if (!response.ok) throw new Error('Heat API unavailable')
+        const heatResponse = await response.json() as Heat[]
         if (cancelled) return
         setHeats(heatResponse)
-        setOperator(operatorResponse)
         const active = heatResponse.find((heat) => !['COMPLETED', 'ABORTED', 'CANCELLED'].includes(heat.status))
         if (active) {
-          authorizedFetch(`/api/v1/heats/${encodeURIComponent(active.heat_no)}/overview`)
-            .then((response) => response.ok ? response.json() : null)
-            .then((value: HeatOverview | null) => { if (!cancelled) setOverview(value) })
+          authorizedFetch(`/api/v1/heats/${encodeURIComponent(active.heat_no)}/overview`, { signal: request.signal })
+            .then((overviewResponse) => overviewResponse.ok ? overviewResponse.json() : null)
+            .then((value: HeatOverview | null) => { if (!cancelled && value) setOverview(value) })
             .catch(() => undefined)
+            .finally(() => window.clearTimeout(deadline))
+          return
         }
-      })
-      .catch((requestError: unknown) => {
-        if (!cancelled) {
-          if (requestError instanceof AuthenticationExpiredError) {
-            onLogout()
-            return
-          }
-          setError('The API is unavailable. Showing demo data from the latest synchronization.')
-          setHeats(demoHeats)
+      } catch (requestError) {
+        if (cancelled) return
+        if (requestError instanceof AuthenticationExpiredError) {
+          onLogout()
+          return
         }
-      })
-      .finally(() => { if (!cancelled) setLoading(false) })
-    return () => { cancelled = true }
+        setError('Heat history is unavailable. Showing demo heat records.')
+        setHeats(demoHeats)
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+
+    void loadHeats()
+    return () => {
+      cancelled = true
+      window.clearTimeout(deadline)
+      request.abort()
+    }
   }, [onLogout])
 
   useEffect(() => subscribeRealtimeTelemetry({
@@ -425,7 +454,7 @@ function Dashboard({ theme, onThemeChange, onLogout, initialOperator }: { theme:
             const permitted = hasPermission(item.permission)
             const enabled = item.enabled !== false && permitted
             const active = item.page === dashboardPage
-            const unavailableReason = item.enabled === false ? 'Available after server delivery' : 'Not permitted for your role'
+            const unavailableReason = item.enabled === false ? 'Available after server delivery' : operator ? 'Not permitted for your role' : 'Waiting for operator permissions'
             return <button className={active ? 'active' : ''} type="button" key={item.label} disabled={!enabled} aria-disabled={!enabled} title={enabled ? undefined : unavailableReason} onClick={() => { if (item.page) navigateToPage(item.page) }}><Icon name={item.icon} /><span>{item.label}</span>{item.badge && <em>{item.badge}</em>}</button>
           })}
         </nav>
@@ -457,7 +486,9 @@ function Dashboard({ theme, onThemeChange, onLogout, initialOperator }: { theme:
         </header>
 
         <div className="dashboard-content">
-          {dashboardPage === 'heat-tracking' && hasPermission('production.view') ? <HeatTracking />
+          {!operator ? (
+            <div className="api-notice" role="status"><Icon name="alarm" /><span>{operatorRetrying ? 'Operator permissions are temporarily unavailable. Retrying…' : 'Checking operator permissions…'}</span></div>
+          ) : dashboardPage === 'heat-tracking' && hasPermission('production.view') ? <HeatTracking />
             : dashboardPage === 'eaf' && hasPermission('production.view') ? <EafDashboard />
               : dashboardPage === 'lf' && hasPermission('production.view') ? <LfDashboard />
                 : dashboardPage === 'ccm' && hasPermission('production.view') ? <CcmDashboard />

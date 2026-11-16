@@ -67,7 +67,14 @@ def reports_dashboard(request: Request) -> Response:
                 COALESCE(samples.total_samples, 0)::bigint AS total_samples,
                 COALESCE(samples.good_samples, 0)::bigint AS good_samples,
                 power.avg_eaf_power_mw::double precision AS avg_eaf_power_mw
-            FROM heats h
+            FROM (
+                SELECT h.*
+                FROM heats h
+                ORDER BY
+                    CASE WHEN h.status NOT IN ('COMPLETED', 'ABORTED', 'CANCELLED') THEN 0 ELSE 1 END,
+                    COALESCE(h.updated_at, h.created_at) DESC
+                LIMIT %s
+            ) h
             LEFT JOIN steel_grades sg ON sg.id = h.grade_id
             LEFT JOIN LATERAL (
                 SELECT
@@ -119,7 +126,6 @@ def reports_dashboard(request: Request) -> Response:
             ORDER BY
                 CASE WHEN h.status NOT IN ('COMPLETED', 'ABORTED', 'CANCELLED') THEN 0 ELSE 1 END,
                 COALESCE(h.updated_at, h.created_at) DESC
-            LIMIT %s
             """,
             [limit],
         )

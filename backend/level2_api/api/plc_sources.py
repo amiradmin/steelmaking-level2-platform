@@ -12,6 +12,11 @@ from rest_framework.response import Response
 from .rbac import require_app_permission
 
 
+def physical_plc_enabled() -> bool:
+    """Allow physical diagnostics to be disabled independently of simulation."""
+    return os.getenv("REAL_PLC_ENABLED", "1").strip().lower() not in {"0", "false", "no", "off"}
+
+
 def _env_int(name: str, default: int) -> int:
     try:
         return int(os.getenv(name, str(default)))
@@ -31,7 +36,7 @@ def _source(area: str, simulator_host: str) -> dict[str, Any]:
         is_real = bool(host_env) and "simulator" not in host_env.lower()
 
     host = host_env if is_real and host_env else simulator_host
-    model = os.getenv(f"{area}_PLC_MODEL", "").strip()
+    model = os.getenv(f"{area}_PLC_MODEL", "").strip() if is_real else "S7-400 process simulator"
     if not model:
         model = "Siemens S7-400" if is_real else "S7-400 process simulator"
 

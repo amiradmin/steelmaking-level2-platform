@@ -13,6 +13,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 
 from .rbac import require_app_permission
+from .plc_sources import physical_plc_enabled
 
 
 REAL_SOURCE_KIND = "REAL_S7"
@@ -82,6 +83,17 @@ def real_plc_latest(request: Request) -> Response:
     area = (request.query_params.get("area") or "EAF").strip().upper()
     if not area or len(area) > 64:
         raise ValidationError({"area": "Area must be a non-empty value up to 64 characters."})
+
+    if not physical_plc_enabled():
+        return Response({
+            "enabled": False,
+            "area": area,
+            "source_kind": REAL_SOURCE_KIND,
+            "verified": False,
+            "fresh": False,
+            "values": [],
+            "detail": "Physical PLC diagnostics are disabled. Use the EAF simulator dashboard.",
+        })
 
     try:
         values = sorted(_latest_real_values(area), key=lambda item: item["tag_name"])

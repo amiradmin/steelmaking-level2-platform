@@ -7,6 +7,7 @@ type HealthStatus = 'online' | 'degraded' | 'offline' | 'idle'
 
 type SystemNode = {
   id: string
+  enabled?: boolean
   label: string
   role: string
   status: HealthStatus
@@ -105,7 +106,7 @@ export function LiveSystemMap({ telemetryStatus }: { telemetryStatus: TelemetryC
 
   const nodeById = useMemo(() => new Map(snapshot?.nodes.map((node) => [node.id, node]) ?? []), [snapshot])
   const flowByPath = useMemo(() => new Map(snapshot?.flows.map((flow) => [`${flow.from}:${flow.to}`, flow]) ?? []), [snapshot])
-  const plcIds = ['eaf', 'lf', 'ccm', 'real-plc']
+  const plcIds = ['eaf', 'lf', 'ccm', 'real-plc'].filter((id) => nodeById.has(id) && nodeById.get(id)?.enabled !== false)
   const deliveryIds = ['heat-management', 'level2-api', 'nginx', 'operator-console']
   const isLive = telemetryStatus === 'live'
 
@@ -124,7 +125,7 @@ export function LiveSystemMap({ telemetryStatus }: { telemetryStatus: TelemetryC
         <div className="system-map-row plc-row">
           {plcIds.map((id) => <MapNode key={id} node={nodeById.get(id)!} />)}
         </div>
-        <div className="system-map-fan unified" aria-label="PLC connections converging to Central OPC UA Gateway">
+        <div className="system-map-fan unified" style={{ gridTemplateColumns: `repeat(${plcIds.length}, minmax(0, 220px))` }} aria-label="PLC connections converging to Central OPC UA Gateway">
           {plcIds.map((id) => {
             const flow = flowByPath.get(`${id}:opcua-gateway`)
             const status = flow?.status ?? 'idle'

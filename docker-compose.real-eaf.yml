@@ -26,6 +26,7 @@ services:
 
   level2-api:
     environment:
+      REAL_PLC_ENABLED: "1"
       EAF_PLC_SOURCE: real
       EAF_PLC_MODEL: ${EAF_PLC_MODEL:-Siemens S7-400}
       EAF_PLC_HOST: ${EAF_PLC_HOST:?Set EAF_PLC_HOST to the real S7-400 IP address}

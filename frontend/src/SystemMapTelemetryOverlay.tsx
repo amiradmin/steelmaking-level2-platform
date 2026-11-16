@@ -62,6 +62,7 @@ type PacketSnapshot = {
 
 type SystemNode = {
   id: string
+  enabled?: boolean
   label: string
   role: string
   status: 'online' | 'degraded' | 'offline' | 'idle'
@@ -222,6 +223,7 @@ export function SystemMapTelemetryOverlay() {
   const [packetSnapshot, setPacketSnapshot] = useState<PacketSnapshot | null>(null)
   const [nodes, setNodes] = useState<Record<string, SystemNode>>({})
   const [openId, setOpenId] = useState<string | null>(null)
+  const physicalEnabled = Boolean(nodes['real-plc']) && nodes['real-plc'].enabled !== false
 
   useEffect(() => {
     const root = document.getElementById('root')
@@ -273,6 +275,8 @@ export function SystemMapTelemetryOverlay() {
     let cancelled = false
     let timer: number | null = null
 
+    if (!physicalEnabled) return
+
     let activeRequest: AbortController | null = null
 
     const refreshRealValues = async () => {
@@ -309,7 +313,7 @@ export function SystemMapTelemetryOverlay() {
       activeRequest?.abort()
       if (timer !== null) window.clearTimeout(timer)
     }
-  }, [targets.length])
+  }, [targets.length, physicalEnabled])
 
   useEffect(() => {
     if (targets.length === 0) return

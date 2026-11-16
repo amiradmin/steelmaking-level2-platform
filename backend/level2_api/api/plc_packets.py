@@ -14,6 +14,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 
 from .rbac import require_app_permission
+from .plc_sources import physical_plc_enabled
 
 CAPTURE_PATH = Path(os.getenv("PLC_PACKET_CAPTURE_PATH", "/capture/plc_packets.json"))
 REAL_PLC_PROBE_TTL_SECONDS = max(
@@ -275,18 +276,19 @@ def plc_packets(request: Request) -> Response:
     # Prefer the raw responses from the Gateway's persistent, read-only DB
     # reads.  The lightweight session probe remains a safe fallback when the
     # passive capture has not yet received its first real PLC response.
-    real_entry = _passive_real_packets(controllers) or _real_plc_entry()
-    real_packets = real_entry.get("packets")
-    trimmed["REAL"] = {
-        **real_entry,
-        "packets": real_packets[:limit] if isinstance(real_packets, list) else [],
-    }
+    if physical_plc_enabled():
+        real_entry = _passive_real_packets(controllers) or _real_plc_entry()
+        real_packets = real_entry.get("packets")
+        trimmed["REAL"] = {
+            **real_entry,
+            "packets": real_packets[:limit] if isinstance(real_packets, list) else [],
+        }
 
     generated_at = datetime.now(timezone.utc).isoformat()
     return Response(
         {
             "available": bool(trimmed),
-            "capture_mode": "PASSIVE_SIMULATORS_PLUS_READ_ONLY_REAL_PLC_S7_PROBE",
+            "capture_mode": "PASSIVE_SIMULATORS_PLUS_READ_ONLY_REAL_PLC_S7_PROBE" if physical_plc_enabled() else "PASSIVE_SIMULATORS",
             "generated_at": generated_at,
             "controllers": trimmed,
         }

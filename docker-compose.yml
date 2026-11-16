@@ -291,6 +291,7 @@ services:
     env_file:
       - .env
     environment:
+      REAL_PLC_ENABLED: ${REAL_PLC_ENABLED:-0}
       DB_HOST: historian-db
       DB_PORT: 5432
       PLC_SIM_TIME_SCALE: ${PLC_SIM_TIME_SCALE:-60}

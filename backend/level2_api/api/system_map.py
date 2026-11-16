@@ -15,6 +15,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 
 from .rbac import require_app_permission
+from .plc_sources import physical_plc_enabled
 
 FRESH_AFTER_SECONDS = 5.0
 
@@ -236,7 +237,8 @@ def live_system_map(request: Request) -> Response:
     real_plc_port = _env_int("CCM_PLC_PORT" if ccm_rnd_configured else "REAL_PLC_PORT", 102)
     real_plc_rack = _env_int("CCM_PLC_RACK" if ccm_rnd_configured else "REAL_PLC_RACK", 0)
     real_plc_slot = _env_int("CCM_PLC_SLOT" if ccm_rnd_configured else "REAL_PLC_SLOT", 3)
-    real_plc_online = _tcp_reachable(real_plc_host, real_plc_port)
+    physical_enabled = physical_plc_enabled() or ccm_rnd_configured
+    real_plc_online = physical_enabled and _tcp_reachable(real_plc_host, real_plc_port)
     ccm_telemetry = controllers.get("ccm", {})
     ccm_source_kind = ccm_telemetry.get("latest_source_kind")
     ccm_rnd_sample_fresh = _status_from_timestamp(ccm_telemetry.get("last_sample_at")) == "online"
@@ -388,6 +390,12 @@ def live_system_map(request: Request) -> Response:
         ),
     ]
 
+    # Retain a disabled node for already-open clients until they refresh.
+    if not physical_enabled:
+        for node in nodes:
+            if node["id"] == "real-plc":
+                node.update(enabled=False, status="idle", detail="Physical PLC diagnostics disabled; EAF uses its simulator")
+
     return Response(
         {
             "generated_at": datetime.now(timezone.utc).isoformat(),
@@ -424,7 +432,7 @@ def live_system_map(request: Request) -> Response:
                     "to": "opcua-gateway",
                     "status": "idle",
                     "label": "standby / read-only",
-                }]
+                }] if physical_enabled else []
             ) + [
                 {"from": "opcua-gateway", "to": "plc-ingestor", "status": opcua_status, "label": "OPC UA"},
                 {"from": "plc-ingestor", "to": "historian", "status": opcua_status, "label": "normalized samples"},

@@ -276,14 +276,18 @@ def _recent_heats() -> list[dict[str, Any]]:
                 h.actual_weight_t::double precision,
                 h.started_at,
                 h.completed_at,
-                MAX(ps.value_double) FILTER (WHERE pt.tag_name = 'EAF.SteelTemperature')::double precision AS peak_eaf_temperature
-            FROM heats h
+                temperature.peak_eaf_temperature::double precision AS peak_eaf_temperature
+            FROM (
+                SELECT * FROM heats ORDER BY created_at DESC LIMIT 6
+            ) h
             LEFT JOIN steel_grades sg ON sg.id = h.grade_id
-            LEFT JOIN process_samples ps ON ps.heat_id = h.id
-            LEFT JOIN process_tags pt ON pt.id = ps.tag_id
-            GROUP BY h.id, h.heat_no, h.status, sg.code, h.planned_weight_t, h.actual_weight_t, h.started_at, h.completed_at
+            LEFT JOIN LATERAL (
+                SELECT MAX(ps.value_double) AS peak_eaf_temperature
+                FROM process_samples ps
+                WHERE ps.heat_id = h.id
+                  AND ps.tag_id = (SELECT id FROM process_tags WHERE tag_name = 'EAF.SteelTemperature')
+            ) temperature ON TRUE
             ORDER BY h.created_at DESC
-            LIMIT 6
             """
         )
         columns = [column[0] for column in cursor.description]

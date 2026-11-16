@@ -3,7 +3,7 @@ from __future__ import annotations
 from statistics import mean
 from typing import Any
 
-from django.db import connection
+from django.db import connection, transaction
 from django.utils import timezone
 from rest_framework.decorators import api_view
 from rest_framework.request import Request
@@ -40,7 +40,10 @@ def reports_dashboard(request: Request) -> Response:
     limit = max(5, min(limit, 50))
     requested_heat = (request.query_params.get("heat_no") or "").strip()
 
-    with connection.cursor() as cursor:
+    with transaction.atomic(), connection.cursor() as cursor:
+        # Compilation costs more than execution for this bounded interactive query.
+        # Keep the setting local so pooled connections retain their normal policy.
+        cursor.execute("SET LOCAL jit = off")
         cursor.execute(
             """
             SELECT
@@ -66,8 +69,15 @@ def reports_dashboard(request: Request) -> Response:
                 COALESCE(alarms.high_alarm_count, 0)::integer AS high_alarm_count,
                 COALESCE(samples.total_samples, 0)::bigint AS total_samples,
                 COALESCE(samples.good_samples, 0)::bigint AS good_samples,
-                power.avg_eaf_power_mw::double precision AS avg_eaf_power_mw
-            FROM heats h
+                samples.avg_eaf_power_mw::double precision AS avg_eaf_power_mw
+            FROM (
+                SELECT h.*
+                FROM heats h
+                ORDER BY
+                    CASE WHEN h.status NOT IN ('COMPLETED', 'ABORTED', 'CANCELLED') THEN 0 ELSE 1 END,
+                    COALESCE(h.updated_at, h.created_at) DESC
+                LIMIT %s
+            ) h
             LEFT JOIN steel_grades sg ON sg.id = h.grade_id
             LEFT JOIN LATERAL (
                 SELECT
@@ -103,23 +113,18 @@ def reports_dashboard(request: Request) -> Response:
             LEFT JOIN LATERAL (
                 SELECT
                     COUNT(*) AS total_samples,
-                    COUNT(*) FILTER (WHERE ps.quality::text = 'GOOD') AS good_samples
+                    COUNT(*) FILTER (WHERE ps.quality::text = 'GOOD') AS good_samples,
+                    AVG(ps.value_double) FILTER (
+                        WHERE ps.tag_id = (SELECT id FROM process_tags WHERE tag_name = 'EAF.PowerMW')
+                          AND ps.quality::text = 'GOOD'
+                          AND ps.value_double IS NOT NULL
+                    ) AS avg_eaf_power_mw
                 FROM process_samples ps
                 WHERE ps.heat_id = h.id
             ) samples ON TRUE
-            LEFT JOIN LATERAL (
-                SELECT AVG(ps.value_double) AS avg_eaf_power_mw
-                FROM process_samples ps
-                JOIN process_tags pt ON pt.id = ps.tag_id
-                WHERE ps.heat_id = h.id
-                  AND pt.tag_name = 'EAF.PowerMW'
-                  AND ps.quality::text = 'GOOD'
-                  AND ps.value_double IS NOT NULL
-            ) power ON TRUE
             ORDER BY
                 CASE WHEN h.status NOT IN ('COMPLETED', 'ABORTED', 'CANCELLED') THEN 0 ELSE 1 END,
                 COALESCE(h.updated_at, h.created_at) DESC
-            LIMIT %s
             """,
             [limit],
         )
